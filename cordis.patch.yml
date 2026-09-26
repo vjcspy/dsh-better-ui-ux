@@ -1,0 +1,18 @@
+# Bundle patch for dsh-better-ui-ux.
+#
+# The DSH profile applies every installed bundle's patch on top of the profile
+# tree, so this file is the whole installation contract: one `insert` row keyed by
+# the package id.
+#
+# Layer order for reference: bundle patches -> profiles/<profile>/cordis.patch.yml
+# -> $DSH_HOME/cordis.patch.yml -> --patch overlay. A profile-level row with the
+# same id overrides this one, and $DSH_HOME/cordis.patch.yml can disable the plugin
+# with `disabled: true` instead of uninstalling the package.
+#
+# The row carries no `config:` block: v1 has no deployment-varying choice, so the
+# Host half is a stub whose only job is to keep a live host fiber so the served
+# client bundle is mounted. Every value the badge renders comes from the Session
+# projection the client reads.
+- insert:
+    - id: dsh-better-ui-ux
+      name: 'dsh-better-ui-ux'
