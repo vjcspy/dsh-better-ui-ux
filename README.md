@@ -1,14 +1,16 @@
 # dsh-better-ui-ux
 
-External [Cordis](https://deepseek-harness.github.io/deepseek-harness/) plugin for **DSH Web** that shows the
-effective model route (**`provider/model`**) of the Session being viewed in the conversation header — for the main
-Session and for every subagent child opened in the main view. It also anchors the composer's
+External [Cordis](https://deepseek-harness.github.io/deepseek-harness/) plugin for **DSH Web** that shows, in the
+conversation header of the Session being viewed, (a) the effective model route (**`provider/model`**) and (b) the
+**delegating tool name** of a subagent child (`agent_analyst`, `subagent`, `subagent_fork`, `spawn_teammate`, …)
+— for the main Session and for every subagent child opened in the main view. It also anchors the composer's
 `conversation.input.right` / `conversation.input.model` controls inside the card while
 `@linxin666/dsh-remote-web-ui` is in compact-picker mode (see "Compact-picker controls anchor" below), a fix moved
 here from the `vjcspy/dsh-web` fork so the fork can retire.
 
 The requirement it answers: clicking into a subagent in the DSH host showed *what it was doing* but never *what it
-was running on*. The header now names the route, and the composer keeps owning the switch.
+was running on* or *which kind of subagent it is*. The header now names both, and the composer keeps owning the
+route switch.
 
 ## What it renders and why from where
 
@@ -30,9 +32,54 @@ The projection is seeded for **every listed Session** and kept current by the co
 pushes, which is what makes one registrant enough for all four cases: main Session, continuable child, one-shot
 child, and Agent Team teammate. The seat is `conversation.session.header.actions` at `order: 0` — after the
 subagent catalog (`-30`), Agent Team (`-20`) and the agent-preset label (`-10`), before background jobs (`+20`).
+The subagent-type badge is a **second, independent registration** on the same seat at `order: -10` (it ties with
+the agent-preset label; slot sorting is stable and ties keep registration sequence, so it lands between that label
+and the model badge). The model badge itself keeps `order: 0` and is untouched.
 
 Nothing is switched from the badge, and nothing is read from the model directory: the badge shows the **raw route**,
 not a catalog display name (see Known limitations).
+
+## Subagent-type badge
+
+The header also renders the **raw delegating tool name** of the shown Session, immediately before the model badge:
+`[ agent_analyst ] [ opencode-go/deepseek-v4.1-flash ]`.
+
+DSH exposes no subagent type to the Web client, so the plugin derives it. The delegating tool name exists in exactly
+one durable place — the **parent's** `tool/call.name` — and a projection's `apply` sees only its own Session's
+events, so the plugin registers its **own session projection on the parent** (`subagentType`, key
+`subagentType`, `stateVersion: 0`) whose value is a map `childSessionId → tool name`, and the badge walks one hop
+up: shown child → its parent (the child's own subagent address first, then the list row's `parentId`) → the
+parent's value for the shown id.
+
+Correlation is conservative by design, because `subagent/catalog` carries no `callId`:
+
+* **Admission** is by tool **name** — `subagent`, `subagent_fork`, `spawn_teammate`, or any `agent_*` — not by
+  argument shape (`bash` also declares a required `description`).
+* **Exact key** — a continuable delegation's result reads `started subagent <childId>`, which names both the call
+  (`message.toolCallId`) and the child, so it binds them outright. The catalog is committed *before* that result
+  exists, so the exact key is also applied on the result fold and outranks a provisional label match. The background
+  arm's `started background subagent job <jobId>` is deliberately **not** matched: that id is a job, not a Session.
+* **Label match** — otherwise the catalog's `label` (the delegation `description`) is matched against the parsed
+  `arguments.description` of every unclaimed, non-errored admitted call preceding it, whether still open or already
+  closed by a background start. It resolves only when **exactly one** candidate remains.
+* **Everything ambiguous renders nothing.** Two same-label siblings (in any foreground/background mix) are hidden
+  rather than swapped, and unclaimed calls expire by `turn` so one never-cataloged call cannot hide every later
+  same-label delegation.
+
+Ordering is expressed in `event.seq` everywhere (an array index does not survive a cold restore), the fold ignores a
+fork child's `inheritedEventCount` prefix so a `subagent_fork` child never adopts its parent's delegations, and the
+resolved map is replaced copy-on-write so a fold that binds nothing publishes no control frame.
+
+| Case | Badge |
+| --- | --- |
+| Main Session (no parent link) | nothing |
+| One-shot `agent_*` child, foreground or background | the tool name, e.g. `agent_analyst` |
+| Continuable child | the tool name (exact key) |
+| Generic `subagent` / `subagent_fork` child | `subagent` / `subagent_fork` |
+| Agent Team teammate | `spawn_teammate` |
+| Two same-label siblings, or a catalog with no label | nothing |
+| Out-of-process child (no `subagent/catalog`) | nothing |
+| Parent projection absent (plugin unloaded) | nothing, no error |
 
 ## Model Experience
 
@@ -90,8 +137,9 @@ seeds once; a second inlined copy would break hooks. `tsdown.config.ts` states t
 it is hand-rolled and cannot import `PLATFORM_MODULES`. **No `dsh.client.external` and no `dsh.client.inject` entry
 exists**: every other input of this plugin is either a type-only import (erased before emit) or its own source.
 
-The Host half is a stub with no configuration: a client bundle is served only for a loader entry with a live Host
-fiber, so the half exists to keep the entry real, and the bundle patch ships a row with no `config:` block.
+The Host half registers the session projection described above; it has **no configuration**, and the bundle patch
+ships a row with no `config:` block. A client bundle is also served only for a loader entry with a live Host fiber,
+so the half has to exist either way.
 
 ## Install into a DSH profile
 
@@ -138,7 +186,7 @@ container started from `dsh-uplift:latest` at `-p 3182:3181`:
 | --- | --- |
 | `pnpm run check` (host + client + test faces) | green on Linux arm64 against the same rc.2 checkout |
 | `pnpm run build` | `lib/client.js` emitted, **5457 bytes — byte-identical in size to the macOS build** |
-| `pnpm run test` | 17/17 green, same two spec files |
+| `pnpm run test` | 17/17 green, same two spec files (the count at that run; the suite is now 6 files / 72 cases) |
 | `import('dsh-better-ui-ux')` from the container profile | resolves and exports `{ apply, name }`, so the Host half loads |
 
 Three container facts are worth recording, because each looked like a plugin defect and is not one:
@@ -155,26 +203,84 @@ Three container facts are worth recording, because each looked like a plugin def
   This plugin is not among the failing rows; the browser-level acceptance evidence above stands on the second
   instance, and the container run establishes cross-platform build, check, test, and module-load parity.
 
+### Container run for the subagent-type badge (2026-09-27)
+
+Re-run in `dsh-uplift:latest` (container `dsh-subagent-type-badge`, published `127.0.0.1:3185`), on the linked
+harness checkout and the pristine npm `@linxin666/dsh-remote-web-ui@0.4.2`, with `agent-browser` driving the page
+from the host:
+
+| Step | Result |
+| --- | --- |
+| `pnpm run check` (host + client + test faces) | green |
+| `pnpm run test` | **6 spec files / 72 cases green** (pre-change baseline: 3 files / 22 cases) |
+| `pnpm run build` | `lib/client.js` 17.87 kB, `lib/index.js` emitted |
+| Boot manifest | `dsh-better-ui-ux/client.js` present; no `failed to import` line |
+
+Badge behaviour, read from the live DOM of a real session (`opencode-go/muse-spark-1.3-contributor`) whose parent
+made one delegation per tool:
+
+| Case | Observed |
+| --- | --- |
+| Main Session | no type badge, model badge only |
+| Foreground one-shot `agent_analyst` child | `agent_analyst` |
+| Background one-shot `agent_scout` child (`run_in_background: true`, result `started background subagent job subagent-1`) | `agent_scout` |
+| Continuable `subagent` child (result `started subagent <id>`) | `subagent` |
+| `subagent_fork` child | `subagent_fork` |
+| That fork child's own child | `agent_scout` — the fork child's own delegation, with `inheritedEventCount: 95` and its parent's seven bindings absent from its own value |
+| Agent Team teammate | `spawn_teammate` |
+| Two same-label siblings (one foreground, one background, one step) | **both hidden** |
+| Header band order | `[Agent Team] [agent_analyst] [Standard mode] [opencode-go/deepseek-v4.1-flash]` |
+| Cold reload with a child shown | badge restored, unchanged |
+| Plugin removed from the profile | no badge, no page error, no crash |
+| Control-frame churn, delegation-free turn | 38 control frames received, **0** carrying `subagentType` |
+| Control-frame churn, delegating turn (positive control) | 112 frames, **5** carrying `subagentType` (incl. a `type: "projection"` item for the key) |
+
+**Reachability is better than the plan assumed.** The plan predicted that a parent last live *before* the plugin was
+installed would never carry the key, and that a `stateVersion` bump would re-orphan every cold row. Neither holds:
+the projection-cache's `coldSnapshot` folds a session's **complete log** on a cold read and writes the refreshed
+checkpoint back (`packages/session/session-projection-cache/src/index.ts`, `coldSnapshot`), and the client requests
+exactly that for the sessions in its list and for every opened child's parent
+(`packages/api/session-controller/src/client/sessions/manager.ts`, `handleConnected`). Measured: a parent created
+with the plugin absent had no `subagentType` row; after installing the plugin and merely loading the page, its row
+existed with all bindings, and a row left at a stale `ver` was rewritten at the registration's current version. So
+pre-existing sessions are not stranded, and a future `stateVersion` bump self-heals on the next read.
+
 ## Layout
 
 ```text
 src/
-  index.ts             Host half: the stub fiber that keeps the client bundle served
-  constants.ts         PLUGIN_ID, the seat name, the order, the locale namespace
+  index.ts             Host half: registers the subagent-type session projection
+  projection.ts        The parent-owned fold: admission, expiry, exact key, label tier, wire view
+  projection-types.ts  The two declaration merges that make the key addressable on both faces
+  constants.ts         PLUGIN_ID, the seat names and orders, the locale namespaces, the projection key
   client/
-    index.ts           Browser half: dictionary + stylesheet + the header-action registration
-    ModelBadge.tsx     The badge: one projection read, one read-only span
-    locales.ts         English dictionary and the namespace's key set
-    styles.ts          The badge's owned, scoped <style> element (data-plugin)
+    index.ts           Browser half: dictionaries + stylesheet + both header-action registrations
+    ModelBadge.tsx     The model badge: one projection read, one read-only span
+    SubagentTypeBadge.tsx  The type badge: child → parent → the parent's value for that child
+    locales.ts         English dictionaries and both namespaces' key sets
+    styles.ts          The badges' owned, scoped <style> element (data-plugin)
     compactPickerControls.ts  The compact-picker _standardControls anchor rules (moved from the dsh-web fork)
 test/
-  client/client-bundle.spec.ts  Bundle identity, baseline-only requests, stylesheet, seat registration
+  host/projection.spec.ts       Admission, label tier, exact key, malformed JSON, fork prefix, expiry, wire stability
+  client/client-bundle.spec.ts  Bundle identity, baseline-only requests, stylesheet, both seat registrations
   client/ModelBadge.spec.ts     null / never-selected / lastUsed / next-marker / frame advance / effort passthrough
+  client/SubagentTypeBadge.spec.ts  Parent resolution, hidden cases, primitive selector, accessible name
   client/compactPickerControls.spec.ts  Rule text, sheet membership, and selector-shape coverage
 ```
 
 ## Known limitations
 
+* **The subagent-type badge renders nothing when the delegation is unresolved.** The correlation rule prefers
+  silence to a guess, so two same-label siblings (in any foreground/background mix), a catalog whose label matches no
+  admitted call, a catalog with no label, and a trimmed teammate label that fails its exact match all hide the badge.
+* **Out-of-process subagent providers cannot be resolved at all.** A provider that sets `localAgent: undefined`
+  (`subagent-acp`, `subagent-codex`, `subagent-claude-code`, `subagent-dsh-sdk`) emits no `subagent/catalog`, so
+  those children have no anchor and render nothing. They also do not create a clickable in-process child to badge.
+* **A profile that overrides `config.toolName` is not admitted.** Admission matches the literal names `subagent`,
+  `subagent_fork`, `spawn_teammate` and the `agent_` prefix; a renamed delegating tool resolves to *hidden*, never to
+  a wrong name.
+* **The badge shows the delegating tool name, not a role.** `agent_analyst` is the invoked tool; the agent markdown's
+  front-matter `name:` is never read, and no effort/route enrichment is shown.
 * **The badge and the composer disagree on purpose, right after a switch.** The badge reports `lastUsed` (what is
   running); the composer's control reports the selection for the *next* request. After switching models and before
   sending, the two surfaces show different routes, and the composer is the one that is ahead. The badge adds its

@@ -34,23 +34,37 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: declares the header actions seat this half registers into.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
-import { HEADER_ACTIONS_SLOT, HEADER_ACTION_ORDER, LOCALE_NAMESPACE, PLUGIN_ID } from '../constants.ts'
+import {
+  HEADER_ACTIONS_SLOT,
+  HEADER_ACTION_ORDER,
+  LOCALE_NAMESPACE,
+  PLUGIN_ID,
+  SUBAGENT_TYPE_ACTION_ID,
+  SUBAGENT_TYPE_ACTION_ORDER,
+  SUBAGENT_TYPE_LOCALE_NAMESPACE,
+} from '../constants.ts'
 import { installCodexUsageViewportSync } from './codexUsageVisibility.ts'
 import { ModelBadge, type ModelBadgeInjected, type ModelBadgeProps } from './ModelBadge.tsx'
-import { en } from './locales.ts'
+import { SubagentTypeBadge, type SubagentTypeBadgeInjected, type SubagentTypeBadgeProps } from './SubagentTypeBadge.tsx'
+import { en, enSubagentType } from './locales.ts'
 import { installModelBadgeStyles } from './styles.ts'
 
 export type { ModelBadgeInjected, ModelBadgeProps } from './ModelBadge.tsx'
+export type { SubagentTypeBadgeInjected, SubagentTypeBadgeProps } from './SubagentTypeBadge.tsx'
 
 /** Services this half reads; both are shell-provided. */
 export const inject = ['slots', 'locale']
 
 /**
- * Register the badge's dictionary, its stylesheet, and the header action.
+ * Register both badges' dictionaries, the stylesheet, and the header actions.
  * @param ctx - browser-side plugin context owning the locale and slot registries.
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(LOCALE_NAMESPACE, 'en', en), `${PLUGIN_ID}: dictionaries`)
+  ctx.effect(
+    () => ctx.locale.register(SUBAGENT_TYPE_LOCALE_NAMESPACE, 'en', enSubagentType),
+    `${PLUGIN_ID}: subagent type dictionary`,
+  )
   installModelBadgeStyles(document)
   ctx.effect(() => {
     if (typeof window === 'undefined') return () => {}
@@ -66,4 +80,14 @@ export function apply(ctx: ClientContext): void {
     locale: LOCALE_NAMESPACE,
     inject: (): ModelBadgeInjected => ({}),
   }, ModelBadge)), `${PLUGIN_ID}: model badge`)
+  // A second, independent registration on the same seat. Its negative order puts
+  // it immediately before the model badge, which keeps `order: 0` for the badge
+  // that already shipped rather than renumbering it.
+  ctx.effect(() => ctx.slots.inject(HEADER_ACTIONS_SLOT, () => ctx.slots.register({
+    name: HEADER_ACTIONS_SLOT,
+    id: SUBAGENT_TYPE_ACTION_ID,
+    order: SUBAGENT_TYPE_ACTION_ORDER,
+    locale: SUBAGENT_TYPE_LOCALE_NAMESPACE,
+    inject: (): SubagentTypeBadgeInjected => ({}),
+  }, SubagentTypeBadge)), `${PLUGIN_ID}: subagent type badge`)
 }

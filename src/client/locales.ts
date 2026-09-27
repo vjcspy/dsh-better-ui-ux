@@ -21,6 +21,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Header model badge: pending marker and accessible names. */
     modelBadge: ModelBadgeKey
+    /** Header subagent-type badge: its accessible name. */
+    subagentTypeBadge: SubagentTypeBadgeKey
   }
 }
 
@@ -37,3 +39,19 @@ export type ModelBadgeKey = keyof typeof en
 
 /** The namespace-bound translate seat the badge component receives. */
 export type ModelBadgeTranslate = PropsLocale<'modelBadge'>['t']
+
+/**
+ * English dictionary for the subagent-type badge.
+ *
+ * The badge's visible text is the raw delegating tool name, which is wire data
+ * and stays verbatim in every locale; only the accessible name is copy.
+ */
+export const enSubagentType = {
+  'aria.type': 'Subagent type: {type}',
+} satisfies Record<string, string>
+
+/** Every key the subagent-type dictionary defines. */
+export type SubagentTypeBadgeKey = keyof typeof enSubagentType
+
+/** The namespace-bound translate seat the subagent-type badge receives. */
+export type SubagentTypeBadgeTranslate = PropsLocale<'subagentTypeBadge'>['t']

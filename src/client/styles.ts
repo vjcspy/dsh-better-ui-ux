@@ -36,9 +36,36 @@ export const MODEL_BADGE_CLASS = 'dsh-model-badge'
 /** Pending-marker class, for the part of the label the badge adds itself. */
 export const MODEL_BADGE_MARKER_CLASS = 'dsh-model-badge-marker'
 
+/**
+ * Subagent-type badge class.
+ *
+ * It shares the badge chrome with {@link MODEL_BADGE_CLASS} through the shared
+ * selector list below rather than by reusing that class name: two registrations
+ * on one seat must stay independently addressable, and the pair reads as one
+ * visual family because it is literally one rule.
+ */
+export const SUBAGENT_TYPE_BADGE_CLASS = 'dsh-subagent-type-badge'
+
 /** The stylesheet text. One rule block per class, no nesting. */
 const SHEET = `
 .${MODEL_BADGE_CLASS} {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 220px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-xs);
+  background: var(--dsw-alias-fill-tsp-secondary);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.${SUBAGENT_TYPE_BADGE_CLASS} {
   display: inline-flex;
   align-items: center;
   gap: 3px;

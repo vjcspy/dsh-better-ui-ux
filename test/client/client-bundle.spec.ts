@@ -18,7 +18,15 @@ import * as React from 'react'
 import * as JsxRuntime from 'react/jsx-runtime'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { HEADER_ACTIONS_SLOT, HEADER_ACTION_ORDER, LOCALE_NAMESPACE, PLUGIN_ID } from '../../src/constants.ts'
+import {
+  HEADER_ACTIONS_SLOT,
+  HEADER_ACTION_ORDER,
+  LOCALE_NAMESPACE,
+  PLUGIN_ID,
+  SUBAGENT_TYPE_ACTION_ID,
+  SUBAGENT_TYPE_ACTION_ORDER,
+  SUBAGENT_TYPE_LOCALE_NAMESPACE,
+} from '../../src/constants.ts'
 
 const BUNDLE_PATH = 'lib/client.js'
 const HOST_ENTRY_PATH = 'lib/index.js'
@@ -275,25 +283,47 @@ describe('built Client bundle', () => {
 describe('built Client apply', () => {
   it('registers its dictionary under the namespace its entry declares', () => {
     const harness = activate()
-    expect(harness.dictionaries).toHaveLength(1)
-    expect(harness.dictionaries[0]!.ns).toBe(LOCALE_NAMESPACE)
-    expect(harness.dictionaries[0]!.locale).toBe('en')
-    expect(harness.dictionaries[0]!.dict['marker.next']).toBe('next')
+    const dictionary = harness.dictionaries.find(entry => entry.ns === LOCALE_NAMESPACE)
+    expect(dictionary).toBeDefined()
+    expect(dictionary!.locale).toBe('en')
+    expect(dictionary!.dict['marker.next']).toBe('next')
+  })
+
+  it('registers a second dictionary for the subagent-type badge', () => {
+    const harness = activate()
+    const dictionary = harness.dictionaries.find(entry => entry.ns === SUBAGENT_TYPE_LOCALE_NAMESPACE)
+    expect(dictionary).toBeDefined()
+    expect(dictionary!.locale).toBe('en')
+    expect(dictionary!.dict['aria.type']).toBe('Subagent type: {type}')
   })
 
   it('registers the badge on the session header actions seat at order 0', () => {
     const harness = activate()
-    expect(harness.entries).toHaveLength(1)
-    expect(harness.entries[0]!.options.name).toBe('conversation.session.header.actions')
-    expect(harness.entries[0]!.options.name).toBe(HEADER_ACTIONS_SLOT)
-    expect(harness.entries[0]!.options.id).toBe(PLUGIN_ID)
-    expect(harness.entries[0]!.options.order).toBe(HEADER_ACTION_ORDER)
-    expect(harness.entries[0]!.options.order).toBe(0)
-    expect(harness.entries[0]!.options.locale).toBe(LOCALE_NAMESPACE)
-    expect(typeof harness.entries[0]!.component).toBe('function')
+    const badge = harness.entries.find(entry => entry.options.id === PLUGIN_ID)
+    expect(badge).toBeDefined()
+    expect(badge!.options.name).toBe('conversation.session.header.actions')
+    expect(badge!.options.name).toBe(HEADER_ACTIONS_SLOT)
+    expect(badge!.options.order).toBe(HEADER_ACTION_ORDER)
+    expect(badge!.options.order).toBe(0)
+    expect(badge!.options.locale).toBe(LOCALE_NAMESPACE)
+    expect(typeof badge!.component).toBe('function')
     // The inject face carries no value: the badge reads only the standard session
     // seats, so nothing is threaded from the apply closure.
-    expect(harness.entries[0]!.options.inject!()).toEqual({})
+    expect(badge!.options.inject!()).toEqual({})
+  })
+
+  it('registers the subagent-type badge on the same seat, immediately before it', () => {
+    const harness = activate()
+    const badge = harness.entries.find(entry => entry.options.id === SUBAGENT_TYPE_ACTION_ID)
+    expect(badge).toBeDefined()
+    expect(badge!.options.name).toBe(HEADER_ACTIONS_SLOT)
+    expect(badge!.options.locale).toBe(SUBAGENT_TYPE_LOCALE_NAMESPACE)
+    expect(typeof badge!.component).toBe('function')
+    expect(badge!.options.inject!()).toEqual({})
+    // The seat sorts ascending, so a negative order renders before the model
+    // badge at 0 without renumbering the registration that already shipped.
+    expect(badge!.options.order).toBe(SUBAGENT_TYPE_ACTION_ORDER)
+    expect(badge!.options.order!).toBeLessThan(HEADER_ACTION_ORDER)
   })
 
   it('injects its stylesheet once, identifying the owning plugin', () => {
