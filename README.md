@@ -2,7 +2,10 @@
 
 External [Cordis](https://deepseek-harness.github.io/deepseek-harness/) plugin for **DSH Web** that shows the
 effective model route (**`provider/model`**) of the Session being viewed in the conversation header — for the main
-Session and for every subagent child opened in the main view.
+Session and for every subagent child opened in the main view. It also anchors the composer's
+`conversation.input.right` / `conversation.input.model` controls inside the card while
+`@linxin666/dsh-remote-web-ui` is in compact-picker mode (see "Compact-picker controls anchor" below), a fix moved
+here from the `vjcspy/dsh-web` fork so the fork can retire.
 
 The requirement it answers: clicking into a subagent in the DSH host showed *what it was doing* but never *what it
 was running on*. The header now names the route, and the composer keeps owning the switch.
@@ -36,6 +39,36 @@ not a catalog display name (see Known limitations).
 The plugin adds no model-visible input: it reads a projection the host already computes and renders nothing into
 the transcript, so prompts, tool results, and KV cache behaviour are unchanged. It costs the page one small
 stylesheet and one read-only `<span>` per shown Session.
+
+## Compact-picker controls anchor
+
+`@linxin666/dsh-remote-web-ui` collapses the composer's trailing box to zero width in compact-picker mode
+(`body.dsh-remote-compact-picker`: portrait + coarse pointer + `innerWidth < 1100`) and re-anchors only its own ring
+and send button. Every other `conversation.input.right` / `conversation.input.model` occupant host renders inside
+`_standardControls` — the OpenCode Go usage pill, the model selector, any other plugin control — stayed
+`position:static` inside that zero-width box, which is the defect this plugin now fixes.
+
+Two CSS rules, injected as part of the plugin's one `<style id="dsh-better-ui-ux-styles">` element
+(`src/client/compactPickerControls.ts`, wired in `src/client/styles.ts`), absolutely position `_standardControls`
+clear of send (`right:48px`), or clear of a ring when one sits directly inside the trailing box (`right:80px`). Both
+are verbatim from the `vjcspy/dsh-web` fork (commit `5ad72861`) — moved here rather than kept in a fork of a
+third-party package, since nothing else in either stylesheet contests the four properties they set. Both rules are
+inert without remote's `dsh-remote-compact-picker` body class: desktop and landscape layouts are untouched.
+
+Verified in a container running the **pristine npm** `@linxin666/dsh-remote-web-ui@0.4.3` (no fork), against a live
+session's real `conversation.input.right` occupant (OpenCode Go usage pill, `Unavailable` state, no credential
+needed):
+
+| Width | Without this rule | With this rule |
+| --- | --- | --- |
+| 393px portrait touch | `_standardControls` collapses to 0 width, `position:static` | span ≈ [192,322], `position:absolute`, `right:48px` |
+| 375px portrait touch | (same collapse) | span ≈ [174,304] |
+| 320px portrait touch | (same collapse) | span ≈ [119,249] |
+| 1280px desktop | `position:static`, span unchanged | unchanged from without-rule (rule inert) |
+
+Rotation (portrait → landscape → portrait) reproduces the same fixed-state numbers, so the fix does not depend on
+remote's sheet re-append order. See "Known limitations" for the coupling this creates and what to re-check on a
+`@linxin666/dsh-remote-web-ui` bump.
 
 ## Local build
 
@@ -133,9 +166,11 @@ src/
     ModelBadge.tsx     The badge: one projection read, one read-only span
     locales.ts         English dictionary and the namespace's key set
     styles.ts          The badge's owned, scoped <style> element (data-plugin)
+    compactPickerControls.ts  The compact-picker _standardControls anchor rules (moved from the dsh-web fork)
 test/
   client/client-bundle.spec.ts  Bundle identity, baseline-only requests, stylesheet, seat registration
   client/ModelBadge.spec.ts     null / never-selected / lastUsed / next-marker / frame advance / effort passthrough
+  client/compactPickerControls.spec.ts  Rule text, sheet membership, and selector-shape coverage
 ```
 
 ## Known limitations
@@ -160,3 +195,18 @@ test/
 * **A child Session that has sent no request shows no badge.** Cold child Sessions are seeded into the projection
   baseline, but a route the Session never used is not a fact worth showing — the badge stays away rather than
   guessing from the parent's route.
+* **The compact-picker controls anchor is coupled to remote's private surface, not a public contract.** The
+  selectors key on `@linxin666/dsh-remote-web-ui`'s body class (`dsh-remote-compact-picker`) and CSS-module suffixes
+  (`_composerSeat`, `_trailing`, `_standardControls`, `_root`, `_track`), and the offsets are derived from remote's
+  own geometry (send at `right:8px`, ring at `right:44px` in compact mode). A `@linxin666/dsh-remote-web-ui` version
+  bump can change either silently; re-measure at 393px and 375px portrait touch (occupant span clear of send and
+  tools; `_standardControls` computed `position:absolute`) whenever that package is bumped. This recheck duty moves
+  here from the retired `dsh-web` fork's own change register.
+* **The `right:80px` ring-in-trailing branch is dormant on the current host.** It matches only when a ring
+  (`_root` containing `_track`) is a direct child of `_trailing`; the current host's only ring (`ContextMeter`)
+  renders in the composer dock, a sibling of `_trailing`, not inside it. The branch is kept for fork parity, covered
+  by a DOM-fixture selector test only (`test/client/compactPickerControls.spec.ts`), and needs a browser recheck the
+  day a host or remote bump puts a ring directly under `_trailing`.
+* **A 320px residual is inherited from the fork era.** At the narrowest tested width the fork register recorded a
+  small overlap with the effort control under some pill copy lengths; this plugin carries the same rules verbatim,
+  so the same residual can recur depending on occupant content width.

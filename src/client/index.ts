@@ -17,6 +17,13 @@
  * correct across resizes and orientation changes. Desktop removes the attribute,
  * so the desktop layout is untouched.
  *
+ * The stylesheet installed below also carries the compact-picker
+ * `_standardControls` anchor for `@linxin666/dsh-remote-web-ui`'s compact
+ * mode, moved here from the `vjcspy/dsh-web` fork -- see `compactPickerControls.ts`
+ * and `styles.ts` for the rule text and its coupling. This half contributes no
+ * additional code for that responsibility: `installModelBadgeStyles` already
+ * installs the whole sheet.
+ *
  * @module dsh-better-ui-ux/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'

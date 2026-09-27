@@ -3,9 +3,9 @@
  *
  * Injected as one `<style data-plugin="dsh-better-ui-ux">` element rather than
  * shipped as a CSS Module: a dynamic plugin bundle has no static stylesheet edge,
- * and the shell's bundler never sees this package. The element is appended under
- * the palette class the badge itself carries — the shell's theme root — so the
- * semantic `--dsw-*` aliases resolve against the active palette, and every value
+ * and the shell's bundler never sees this package. The element is appended to
+ * `document.head`, so the semantic `--dsw-*` aliases resolve against whichever
+ * palette class is active on the theme root at read time, and every value
  * here is one of those aliases rather than a literal colour.
  *
  * The hook is idempotent: two activations (an HMR reload, or a second mount in the
@@ -17,9 +17,15 @@
  * class, so the rule keys on the global `data-dsh-codex-usage` attribute this
  * plugin maintains: `hidden` hides the pill, any other state (or desktop, where
  * the attribute is removed) leaves it untouched.
+ *
+ * The sheet also carries the compact-picker `_standardControls` anchor, moved
+ * here from the `vjcspy/dsh-web` fork of `@linxin666/dsh-remote-web-ui`
+ * (fork commit `5ad72861`): see `compactPickerControls.ts` for the rule text,
+ * its coupling to remote's private geometry, and the re-measure guidance.
  */
 
 import { CODEX_USAGE_ATTR } from './codexUsageVisibility.ts'
+import { COMPACT_PICKER_CONTROLS_SHEET } from './compactPickerControls.ts'
 
 /** Element id of the injected stylesheet. */
 const STYLE_ELEMENT_ID = 'dsh-better-ui-ux-styles'
@@ -61,7 +67,7 @@ const SHEET = `
     display: none !important;
   }
 }
-`
+${COMPACT_PICKER_CONTROLS_SHEET}`
 
 /**
  * Append the badge stylesheet once per document.

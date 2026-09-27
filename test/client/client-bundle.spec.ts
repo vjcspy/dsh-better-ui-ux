@@ -304,6 +304,14 @@ describe('built Client apply', () => {
     // Tokens, not literal colours: the sheet must resolve against the active palette.
     expect(styleElements[0]!.text).toContain('--dsw-alias-label-tertiary')
     expect(styleElements[0]!.text).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+    // The compact-picker `_standardControls` anchor moved from the `dsh-web` fork
+    // (commit `5ad72861`) must survive the client build unmodified.
+    expect(styleElements[0]!.text).toContain(
+      'body.dsh-remote-compact-picker [class$="_composerSeat"] [class$="_trailing"] > [class$="_standardControls"]{position:absolute;right:48px;top:50%;transform:translateY(-50%)}',
+    )
+    expect(styleElements[0]!.text).toContain(
+      'body.dsh-remote-compact-picker [class$="_composerSeat"] [class$="_trailing"]:has(> [class$="_root"]:has([class$="_track"])) > [class$="_standardControls"]{right:80px}',
+    )
   })
 
   it('does not stack a second stylesheet when the same document activates twice', () => {
