@@ -10,6 +10,13 @@
  * seats, so this half contributes a component and its copy, nothing else. No store
  * is declared, because the badge owns no viewing state to share.
  *
+ * This half also owns the mobile visibility gate for the subscription usage
+ * pill: the stylesheet hides that pill while `<html>` carries
+ * `data-dsh-codex-usage="hidden"`, the badge render keeps that attribute in sync
+ * with the shown Session's provider, and a viewport listener below keeps it
+ * correct across resizes and orientation changes. Desktop removes the attribute,
+ * so the desktop layout is untouched.
+ *
  * @module dsh-better-ui-ux/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -21,6 +28,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 import { HEADER_ACTIONS_SLOT, HEADER_ACTION_ORDER, LOCALE_NAMESPACE, PLUGIN_ID } from '../constants.ts'
+import { installCodexUsageViewportSync } from './codexUsageVisibility.ts'
 import { ModelBadge, type ModelBadgeInjected, type ModelBadgeProps } from './ModelBadge.tsx'
 import { en } from './locales.ts'
 import { installModelBadgeStyles } from './styles.ts'
@@ -37,6 +45,10 @@ export const inject = ['slots', 'locale']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(LOCALE_NAMESPACE, 'en', en), `${PLUGIN_ID}: dictionaries`)
   installModelBadgeStyles(document)
+  ctx.effect(() => {
+    if (typeof window === 'undefined') return () => {}
+    return installCodexUsageViewportSync(document, window)
+  }, `${PLUGIN_ID}: codex usage visibility`)
   // `inject` waits on the seat's own declaration and removes the contribution
   // when that declaration collapses, so this needs no ordering assumption
   // against the conversation plugin's activation.

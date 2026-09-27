@@ -14,6 +14,12 @@
  *
  * A thin session that never sent a request renders nothing, because a route it
  * never used is not a fact worth showing.
+ *
+ * Side channel: every render reports its effective provider to the mobile
+ * subscription-visibility gate (`reportEffectiveProvider`), so the Codex usage
+ * pill stays hidden on mobile unless this Session runs a `codex` route. The call
+ * is a no-op without a DOM (SSR, unit tests) and never changes what the badge
+ * itself renders.
  */
 
 import type { ReactNode } from 'react'
@@ -24,6 +30,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 // Type-only: pulls the ui-conversation SlotMap merge (the header actions seat).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
+import { reportEffectiveProvider } from './codexUsageVisibility.ts'
 import { MODEL_BADGE_CLASS, MODEL_BADGE_MARKER_CLASS } from './styles.ts'
 
 /** Registration-side business face: this badge needs no injected value. */
@@ -45,15 +52,22 @@ export type ModelBadgeProps =
  */
 export function ModelBadge({ useProjection, t }: ModelBadgeProps): ReactNode {
   const projection = useProjection('modelSelection')
-  if (projection === undefined) return null
+  if (projection === undefined) {
+    reportEffectiveProvider(undefined)
+    return null
+  }
 
   // `next` is the host's `pending ?? lastUsed`, so a non-null `lastUsed` is the
   // route already consumed by a request: that is what "running" means here, and
   // it wins over a later selection that no request has used yet.
   const running = projection.lastUsed
   const model = running ?? projection.next
-  if (model === null) return null
+  if (model === null) {
+    reportEffectiveProvider(null)
+    return null
+  }
 
+  reportEffectiveProvider(model.provider)
   const route = `${model.provider}/${model.model}`
   const next = running === null
   return (

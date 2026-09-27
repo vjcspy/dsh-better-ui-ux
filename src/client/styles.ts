@@ -10,7 +10,16 @@
  *
  * The hook is idempotent: two activations (an HMR reload, or a second mount in the
  * same document) share the one element instead of stacking copies.
+ *
+ * The sheet also owns the mobile gate for the subscription usage pill. That pill
+ * (from `dsh-plugin-subscriptions`) renders into the host stats row
+ * (`[data-composer-stats]`) as a `button[aria-haspopup="dialog"]` with no stable
+ * class, so the rule keys on the global `data-dsh-codex-usage` attribute this
+ * plugin maintains: `hidden` hides the pill, any other state (or desktop, where
+ * the attribute is removed) leaves it untouched.
  */
+
+import { CODEX_USAGE_ATTR } from './codexUsageVisibility.ts'
 
 /** Element id of the injected stylesheet. */
 const STYLE_ELEMENT_ID = 'dsh-better-ui-ux-styles'
@@ -43,6 +52,14 @@ const SHEET = `
 .${MODEL_BADGE_MARKER_CLASS} {
   flex: none;
   color: var(--dsw-alias-label-secondary);
+}
+:root[${CODEX_USAGE_ATTR}="hidden"] [data-composer-stats] button[aria-haspopup="dialog"] {
+  display: none !important;
+}
+@supports selector(:has(*)) {
+  :root[${CODEX_USAGE_ATTR}="hidden"] [data-composer-stats] span:has(> button[aria-haspopup="dialog"]) {
+    display: none !important;
+  }
 }
 `
 
