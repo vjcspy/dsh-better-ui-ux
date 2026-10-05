@@ -1,16 +1,53 @@
 # dsh-better-ui-ux
 
-External [Cordis](https://deepseek-harness.github.io/deepseek-harness/) plugin for **DSH Web** that shows, in the
-conversation header of the Session being viewed, (a) the effective model route (**`provider/model`**) and (b) the
-**delegating tool name** of a subagent child (`agent_analyst`, `subagent`, `subagent_fork`, `spawn_teammate`, …)
-— for the main Session and for every subagent child opened in the main view. It also anchors the composer's
-`conversation.input.right` / `conversation.input.model` controls inside the card while
-`@linxin666/dsh-remote-web-ui` is in compact-picker mode (see "Compact-picker controls anchor" below), a fix moved
-here from the `vjcspy/dsh-web` fork so the fork can retire.
+External [Cordis](https://deepseek-harness.github.io/deepseek-harness/) plugin for **DSH Web** with three
+independent contributions:
 
-The requirement it answers: clicking into a subagent in the DSH host showed *what it was doing* but never *what it
-was running on* or *which kind of subagent it is*. The header now names both, and the composer keeps owning the
-route switch.
+1. **Header badges** — the conversation header of the Session being viewed shows (a) the effective model route
+   (**`provider/model`**) and (b) the **delegating tool name** of a subagent child (`agent_analyst`, `subagent`,
+   `subagent_fork`, `spawn_teammate`, …) for the main Session and for every subagent child opened in the main view.
+2. **New-Session sidebar default** — a genuinely new top-level Session arrives with the right sidebar **expanded on
+   its Files panel**, on a viewport at least 768px wide. See "New-Session Files default" below.
+3. **Compact-picker controls anchor** — the composer's `conversation.input.right` / `conversation.input.model`
+   controls are anchored inside the card while `@linxin666/dsh-remote-web-ui` is in compact-picker mode, a fix moved
+   here from the `vjcspy/dsh-web` fork so the fork can retire.
+
+The requirement the first contribution answers: clicking into a subagent in the DSH host showed *what it was doing*
+but never *what it was running on* or *which kind of subagent it is*. The header now names both, and the composer
+keeps owning the route switch.
+
+## New-Session Files default
+
+The right column is opened by an effect carrier on the **`conversation.input.overlay`** seat (`kind: 'list'`,
+`scope: 'session'`) — **not** on `conversation.session.header.actions`, which is where the two badges live. The seat
+choice is load-bearing: the conversation header renders only inside the conversation chrome, and the chrome is
+suppressed for exactly the Session this contribution targets, so on the header seat the default would land on the
+first prompt submit instead of when the Session opens.
+
+| Condition | Behaviour |
+| --- | --- |
+| Client reports the shown Session as `blank`, `parentId === undefined`, `origin !== 'subagent'` | candidate for the default |
+| Viewport `< 768px` | nothing — below the breakpoint the column is a full-width drawer, where forcing it open is a regression |
+| Column is not following the shown Session (`sidebarRight.mounted`) | nothing — a composer seat renders for whatever Session it is given |
+| Column already expanded, or holding an active tab while collapsed | nothing — a remembered layout is the Human's |
+| Otherwise | `openTab('files')`, which expands the column **and** activates the panel in one call |
+
+Nothing is configurable. There is no `defaultTab` setting: the host exposes no default-panel key, so the only route
+is to open the page, and the panel is fixed to `files`.
+
+**Why the decision is a microtask rather than a `useEffect`.** The effect hook cannot be imported: this half must
+request nothing outside the shell's JSX runtime, and `test/client/client-bundle.spec.ts` freezes that
+(`materializationRequests` must contain `react/jsx-runtime` and must **not** contain `react`, which a `useEffect`
+value import puts there); no client-baseline module re-exports a hook. The check therefore runs in the render pass
+and the open is deferred with `queueMicrotask` — after the commit that rendered it, which is the host's own
+documented moment (`mounted` moves before React renders the session change, and the Session's sidebar store is
+minted in that same commit). The opener re-reads `mounted` / `isExpanded()` / `active()` inside the microtask, so a
+column opened or collapsed in between is still respected.
+
+**Failure posture.** Every guard fails towards doing nothing, and a throwing `openTab` (no `files` page registered,
+or a Session whose sidebar store was never adopted) is caught and reported with `console.warn` naming the plugin and
+the error — a cosmetic default must never break the composer, and the warning is the only runtime signal that
+separates "threw" from "guard skipped".
 
 ## What it renders and why from where
 
@@ -252,11 +289,14 @@ src/
   index.ts             Host half: registers the subagent-type session projection
   projection.ts        The parent-owned fold: admission, expiry, exact key, label tier, wire view
   projection-types.ts  The two declaration merges that make the key addressable on both faces
-  constants.ts         PLUGIN_ID, the seat names and orders, the locale namespaces, the projection key
+  constants.ts         PLUGIN_ID, the seat names and orders, the locale namespaces, the projection key,
+                       the sidebar tab kind and the narrow-viewport breakpoint
   client/
     index.ts           Browser half: dictionaries + stylesheet + both header-action registrations
+                       + the scoped sidebar default on the composer overlay seat
     ModelBadge.tsx     The model badge: one projection read, one read-only span
     SubagentTypeBadge.tsx  The type badge: child → parent → the parent's value for that child
+    DefaultSidebarTab.tsx  The new-Session Files default: guard, then open the panel in a microtask
     locales.ts         English dictionaries and both namespaces' key sets
     styles.ts          The badges' owned, scoped <style> element (data-plugin)
     compactPickerControls.ts  The compact-picker _standardControls anchor rules (moved from the dsh-web fork)

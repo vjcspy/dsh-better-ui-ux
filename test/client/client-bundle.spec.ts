@@ -206,6 +206,16 @@ function activate(documentOverride?: Document): ApplyHarness {
         return () => {}
       },
     },
+    /**
+     * The scoped child context the sidebar default is wired through. The shell
+     * hands a real child context to the callback; here the same stub stands in
+     * for it, so the callback's wiring runs and its registration is captured.
+     * Assigned after the literal, because the callback is handed this object.
+     */
+    inject: (_names: readonly string[], body: (scoped: unknown) => void) => {
+      body(ctx)
+      return () => {}
+    },
   }
   ;(globalThis as Record<string, unknown>).document = documentOverride ?? stub.doc
   try {

@@ -24,6 +24,13 @@
  * additional code for that responsibility: `installModelBadgeStyles` already
  * installs the whole sheet.
  *
+ * A third contribution gives a new Session the Files panel as its right
+ * column's default (see `DefaultSidebarTab.tsx`). It rides a composer seat, not
+ * the header seat above, because the header is suppressed for exactly the blank
+ * Session it targets, and it is registered from a scoped `ctx.inject` child
+ * context -- the plugin-level `inject` list below stays unchanged, so this
+ * optional dependency can never hold the badges or the stylesheet pending.
+ *
  * @module dsh-better-ui-ux/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -33,8 +40,12 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: declares the header actions seat this half registers into.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+// Type-only: declares the `sidebarRight` member the scoped child context below resolves.
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 
 import {
+  COMPOSER_OVERLAY_SLOT,
+  DEFAULT_TAB_ID,
   HEADER_ACTIONS_SLOT,
   HEADER_ACTION_ORDER,
   LOCALE_NAMESPACE,
@@ -44,11 +55,18 @@ import {
   SUBAGENT_TYPE_LOCALE_NAMESPACE,
 } from '../constants.ts'
 import { installCodexUsageViewportSync } from './codexUsageVisibility.ts'
+import {
+  DefaultSidebarTab,
+  createOpenFilesByDefault,
+  type DefaultSidebarTabInjected,
+  type DefaultSidebarTabProps,
+} from './DefaultSidebarTab.tsx'
 import { ModelBadge, type ModelBadgeInjected, type ModelBadgeProps } from './ModelBadge.tsx'
 import { SubagentTypeBadge, type SubagentTypeBadgeInjected, type SubagentTypeBadgeProps } from './SubagentTypeBadge.tsx'
 import { en, enSubagentType } from './locales.ts'
 import { installModelBadgeStyles } from './styles.ts'
 
+export type { DefaultSidebarTabInjected, DefaultSidebarTabProps } from './DefaultSidebarTab.tsx'
 export type { ModelBadgeInjected, ModelBadgeProps } from './ModelBadge.tsx'
 export type { SubagentTypeBadgeInjected, SubagentTypeBadgeProps } from './SubagentTypeBadge.tsx'
 
@@ -90,4 +108,21 @@ export function apply(ctx: ClientContext): void {
     locale: SUBAGENT_TYPE_LOCALE_NAMESPACE,
     inject: (): SubagentTypeBadgeInjected => ({}),
   }, SubagentTypeBadge)), `${PLUGIN_ID}: subagent type badge`)
+  // The sidebar default is the one contribution that depends on a service this
+  // plugin does not own, so its dependency is declared on a CHILD context rather
+  // than in the plugin-level `inject` above: a plugin-level dependency holds the
+  // whole plugin pending until that service exists and unloads/re-applies it
+  // whenever the service changes — which would take both badges and the
+  // load-bearing compact-picker stylesheet with it, in a deployment whose
+  // sidebar is absent or reloading. The child scope's registration disposes with
+  // it, so this contribution simply disappears when there is no sidebar.
+  ctx.inject(['sidebarRight'], (scoped) => {
+    scoped.effect(() => scoped.slots.inject(COMPOSER_OVERLAY_SLOT, () => scoped.slots.register({
+      name: COMPOSER_OVERLAY_SLOT,
+      id: DEFAULT_TAB_ID,
+      inject: (): DefaultSidebarTabInjected => ({
+        resolveFilesOpener: createOpenFilesByDefault(scoped),
+      }),
+    }, DefaultSidebarTab)), `${PLUGIN_ID}: default sidebar tab`)
+  })
 }
