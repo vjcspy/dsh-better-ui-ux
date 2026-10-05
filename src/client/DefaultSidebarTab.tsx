@@ -30,6 +30,15 @@
  * baseline-specifier case in `test/client/client-bundle.spec.ts`). The microtask
  * runs after the commit that rendered it, never during the render.
  *
+ * Nothing is remembered between renders, deliberately: the opener re-reads the
+ * column's own state inside the microtask and the host dedupes a page that is
+ * already open, so a second scheduled open is a no-op rather than a duplicate.
+ * The per-Session mark that used to stand here had to hold a Session id, and a
+ * Session id is a branded string at run time — a value no `WeakSet` can hold and
+ * a `Set` could only grow with. A deployment where the open keeps failing
+ * therefore warns once per render rather than once per Session, which is the
+ * honest signal: the panel is still not open.
+ *
  * Every guard fails towards doing nothing: a cosmetic default must never break
  * the composer. The warning in the open callback is deliberate rather than
  * noise — it is the only runtime signal that separates a throwing call from a
@@ -67,12 +76,6 @@ export type DefaultSidebarTabProps =
   PropsRuntime<'conversation.input.overlay'>
   & SessionStandardProps
   & DefaultSidebarTabInjected
-
-/**
- * Sessions this component has already scheduled an open for, so a re-render
- * before the microtask flushes does not queue a second one.
- */
-const scheduled = new WeakSet<SessionId>()
 
 /**
  * Build the opener over the sidebar face one resolved context carries.
@@ -133,12 +136,13 @@ export function DefaultSidebarTab({ useSessions, sessionId, resolveFilesOpener }
   // Below this width the column is a full-width drawer, where forcing it open is
   // a regression rather than a default.
   const wideEnough = typeof window === 'undefined' ? false : window.innerWidth >= NARROW_VIEWPORT_PX
-  if (isNewTopLevelSession && wideEnough && !scheduled.has(sessionId)) {
+  if (isNewTopLevelSession && wideEnough) {
     const open = resolveFilesOpener(sessionId)
     if (open !== undefined) {
-      scheduled.add(sessionId)
       // Deferred out of the render pass: the caller acts on another store, and a
-      // render-phase write there would re-enter React's own render.
+      // render-phase write there would re-enter React's own render. No mark is
+      // kept: a second microtask for the same Session re-reads the column's own
+      // state and finds the page already open.
       queueMicrotask(open)
     }
   }
