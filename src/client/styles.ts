@@ -22,9 +22,18 @@
  * here from the `vjcspy/dsh-web` fork of `@linxin666/dsh-remote-web-ui`
  * (fork commit `5ad72861`): see `compactPickerControls.ts` for the rule text,
  * its coupling to remote's private geometry, and the re-measure guidance.
+ *
+ * The sheet also owns the mobile composer's measurement fix. Remote's mobile
+ * layer sizes `_trailing` from the row's content width (`flex-basis:100%`) and
+ * then adds 38px + 78px of padding, while core pins `flex-shrink:0`
+ * (`InputBar.module.css`) — a 116px overhang, resolved by the transcript's own
+ * scroll body as a horizontal scroll. Switching that one box to `border-box`
+ * keeps remote's intent (a full-width trailing line reserving the send button's
+ * corner) and changes only how the box is measured. Its keydown twin is
+ * `mobileComposerEnter.ts`, under the same `MOBILE_MAX_WIDTH` bound.
  */
 
-import { CODEX_USAGE_ATTR } from './codexUsageVisibility.ts'
+import { CODEX_USAGE_ATTR, MOBILE_MAX_WIDTH } from './codexUsageVisibility.ts'
 import { COMPACT_PICKER_CONTROLS_SHEET } from './compactPickerControls.ts'
 
 /** Element id of the injected stylesheet. */
@@ -45,6 +54,17 @@ export const MODEL_BADGE_MARKER_CLASS = 'dsh-model-badge-marker'
  * visual family because it is literally one rule.
  */
 export const SUBAGENT_TYPE_BADGE_CLASS = 'dsh-subagent-type-badge'
+
+/**
+ * The mobile composer override, gated on the conditions remote's own mobile
+ * layer keys on (`orientation: portrait` + `pointer: coarse` + a viewport
+ * narrower than {@link MOBILE_MAX_WIDTH}) rather than on remote's active-state
+ * body class, which 0.4.5 renamed. The `html body` prefix is a defensive
+ * tiebreaker against a future remote rule, not a precedence requirement: no rule
+ * in either sheet sets `box-sizing` on `_trailing` today, so the declaration
+ * already wins. No `!important`.
+ */
+const MOBILE_COMPOSER_OVERRIDE = `@media (orientation:portrait) and (pointer:coarse) and (max-width:${MOBILE_MAX_WIDTH - 0.02}px){html body [class$="_composerSeat"] [class$="_trailing"]{box-sizing:border-box}}`
 
 /** The stylesheet text. One rule block per class, no nesting. */
 const SHEET = `
@@ -94,7 +114,7 @@ const SHEET = `
     display: none !important;
   }
 }
-${COMPACT_PICKER_CONTROLS_SHEET}`
+${COMPACT_PICKER_CONTROLS_SHEET}${MOBILE_COMPOSER_OVERRIDE}`
 
 /**
  * Append the badge stylesheet once per document.

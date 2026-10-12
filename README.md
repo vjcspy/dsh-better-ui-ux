@@ -356,3 +356,13 @@ test/
 * **A 320px residual is inherited from the fork era.** At the narrowest tested width the fork register recorded a
   small overlap with the effort control under some pill copy lengths; this plugin carries the same rules verbatim,
   so the same residual can recur depending on occupant content width.
+* **The mobile composer fixes are coupled to core's, Lexical's and remote's private surface, not a public contract.**
+  The `box-sizing` override keys on core's CSS-module suffixes (`_composerSeat`, `_trailing`), the second-Enter send on
+  core's `[data-composer-input]` hook, the send/stop roles on `svg path` vs `svg rect` inside `_primary`, and the
+  trailing-newline rule on Lexical's `data-lexical-managed-linebreak` placeholder; the gate reproduces remote's own
+  conditions (`orientation: portrait` + `pointer: coarse` + `innerWidth < 1100`) rather than its active-state body
+  class. Re-check all of them on a core, Lexical or `@linxin666/dsh-remote-web-ui` bump — 0.4.5 already renamed the
+  class the compact-picker anchor above keys on, and that recheck was missed at 0.4.4 → 0.4.5.
+* **A `/`-menu draft that already ends with a linebreak sends on the next Enter.** Remote turns Enter into a newline
+  even with the command menu open, so nothing regresses there; the one new combination this adds is "menu open + draft
+  ending in a linebreak + Enter" → send.

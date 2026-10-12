@@ -17,12 +17,23 @@
  * correct across resizes and orientation changes. Desktop removes the attribute,
  * so the desktop layout is untouched.
  *
+ * The mobile layer is also where a plain Enter can only break the line, because
+ * `@linxin666/dsh-remote-web-ui` captures Enter at `document` level in the
+ * capture phase and inserts the newline itself. The second effect below owns the
+ * counterpart gesture: on the same portrait coarse-pointer viewport, an Enter
+ * that arrives while the draft already ends with a linebreak sends the message
+ * through the rendered send button, and one Enter keeps that layer's newline. It
+ * listens on `window` in the capture phase -- ahead of remote's `document`
+ * capture handler whatever the mount order -- and contributes no state: the
+ * viewport and the caret are both read per event (`mobileComposerEnter.ts`).
+ *
  * The stylesheet installed below also carries the compact-picker
  * `_standardControls` anchor for `@linxin666/dsh-remote-web-ui`'s compact
  * mode, moved here from the `vjcspy/dsh-web` fork -- see `compactPickerControls.ts`
  * and `styles.ts` for the rule text and its coupling. This half contributes no
  * additional code for that responsibility: `installModelBadgeStyles` already
- * installs the whole sheet.
+ * installs the whole sheet, together with the mobile composer's `box-sizing`
+ * override.
  *
  * A third contribution gives a new Session the Files panel as its right
  * column's default (see `DefaultSidebarTab.tsx`). It rides a composer seat, not
@@ -55,6 +66,7 @@ import {
   SUBAGENT_TYPE_LOCALE_NAMESPACE,
 } from '../constants.ts'
 import { installCodexUsageViewportSync } from './codexUsageVisibility.ts'
+import { installMobileComposerEnter } from './mobileComposerEnter.ts'
 import {
   DefaultSidebarTab,
   createOpenFilesByDefault,
@@ -88,6 +100,13 @@ export function apply(ctx: ClientContext): void {
     if (typeof window === 'undefined') return () => {}
     return installCodexUsageViewportSync(document, window)
   }, `${PLUGIN_ID}: codex usage visibility`)
+  // The mobile layer's second-Enter send. Same window as the gate above, and one
+  // capture listener: the capture path starts at `window`, so this decision runs
+  // before remote's `document` capture handler turns the key into a newline.
+  ctx.effect(() => {
+    if (typeof window === 'undefined') return () => {}
+    return installMobileComposerEnter(document, window)
+  }, `${PLUGIN_ID}: mobile composer enter`)
   // `inject` waits on the seat's own declaration and removes the contribution
   // when that declaration collapses, so this needs no ordering assumption
   // against the conversation plugin's activation.
