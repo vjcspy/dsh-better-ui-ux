@@ -31,6 +31,88 @@
  * keeps remote's intent (a full-width trailing line reserving the send button's
  * corner) and changes only how the box is measured. Its keydown twin is
  * `mobileComposerEnter.ts`, under the same `MOBILE_MAX_WIDTH` bound.
+ *
+ * The sheet lastly owns the two-tier title-row shed (`TITLE_ROW_SHED`), which is
+ * what keeps the Session name readable on a phone. Why a container query: on a
+ * phone the box that runs out of width is the header's title row, not the
+ * viewport, so both tiers are `@container` blocks keyed on core's own
+ * `[class$="_titleRow"]` — an anonymous `inline-size` container
+ * (`ConversationRoot.module.css`) that already carries core's parallel rule for
+ * its own occupant, `AgentPresetLabel.module.css` hiding a 180px passive label at
+ * `@container (max-width: 540px)` under the doctrine "the preset is passive
+ * chrome, so it yields before any interactive header action loses its label".
+ * Our badges sit inside that same container (`.headerActions` is a child of the
+ * row), and `@linxin666/dsh-remote-web-ui` declares no container of its own (zero
+ * `container-type`, zero `@container` over its installed source), so the nearest
+ * query container for them is core's row. Keying on the row rather than on
+ * viewport conditions is also what survives that layer's per-session
+ * force-desktop escape (`mobile-adapt.ts`), where a media query would still fire.
+ *
+ * Measured phone budget, which is where the two thresholds come from. `.header`'s
+ * second grid column is `minmax(0, 1fr)` with `padding: 10px 28px 0 20px`, so a
+ * 390px viewport leaves the title row 342px; remote's mobile layer removes another
+ * 52px of left padding whenever the sidebar rail is collapsed — the normal phone
+ * state — leaving 290px. The two reachable ends are therefore viewport − 100px
+ * with that rule active (290px at 390, 330px at 430, the largest mainstream phone
+ * class) and viewport − 48px wherever it is not in force (the layer's own
+ * force-desktop escape, or the layer disabled): 342px at 390 and 382px at 430.
+ * That last figure is why the hide threshold is 460px and not 380px — a 380px
+ * threshold would miss 382px by 2px and silently drop the whole phone fix in that
+ * state — while 460px still sits far below the 540px where core sheds its own
+ * occupant.
+ *
+ * Two Session states, one fix. With a single tab our badges are `flex: none`
+ * siblings of the name, and one 234px badge (220 content + 12 padding + 2 border,
+ * the plugin default content-box) leaves the name ~26px of a 290px row: the
+ * reported "tên không hiện đủ". With several tabs remote takes that same actions
+ * box out of flow, paints it over the tabs row and reserves its measured width
+ * there, which instead leaves core's own 220px `.crumb` cap as the only thing
+ * truncating the name. The hide tier removes our width from both states: it gives
+ * the name back core's cap in the single-tab state (and the crumb rule below
+ * releases that cap), and it empties the painted box, so the tabs row's reserve
+ * falls from ~242px to the empty box's ~8px.
+ *
+ * Truncation lives on an inner element. Both badges are `inline-flex` whose only
+ * content was a bare text node — an anonymous flex item — and `text-overflow` is
+ * defined for block containers, so a capped badge hard-clipped mid-token with no
+ * ellipsis. A flex item is blockified, so `MODEL_BADGE_TEXT_CLASS` and
+ * `SUBAGENT_TYPE_BADGE_TEXT_CLASS` are real block containers and own the ellipsis
+ * while the badge keeps its cap.
+ *
+ * The provider yields before the model. Once the badge is narrower than the route
+ * an end-ellipsis would print `dsh-opencode-go/deep…` — the provider is the
+ * constant half of the text and the model id is the half that identifies the route
+ * — so every tier that caps the badge hides the provider element, including its
+ * `/` separator. `title` and `aria-label` keep the full route in every tier.
+ *
+ * A child keeps a compact badge. An addressed child's composer renders no model
+ * control (`ui-model-selection`: `available = sessions.subagentAddress(sessionId)
+ * === undefined`, and `ModelSelect` returns null without it), so this header badge
+ * is the only place that child's route is visible; it therefore survives the phone
+ * tier as a 128px content box — 142px border-box of a ~290px row, leaving the
+ * child's own title ~118px — marked by `data-dsh-child` on our own element. The
+ * subagent-type badge yields instead, because the fact it shows is also on the
+ * lineage slot's own UI.
+ *
+ * The crumb rule lists ONE suffix and governs root Sessions only.
+ * `[class$="_crumbCurrent"]` is unconditional and last in the current crumb's class
+ * list (`ConversationSession.tsx`), so its attribute always ends there, while
+ * `[class$="_crumb"]` and `[class$="_crumbSubagent"]` can only ever match the
+ * ancestor navigation buttons, which stay capped. For a child Session the visible
+ * title is the lineage switcher and its own `max-width`, not this crumb. Above the
+ * phone tier core's 220px cap still applies; raising it there is a core change and
+ * a separate task.
+ *
+ * Accepted noise: the cluster's 10px gap survives an empty actions box on a phone
+ * row, because our badges are hidden with CSS and stay DOM children while
+ * `.headerActions` has no `:empty` rule. Reshaping a seat other plugins also
+ * occupy would be the worse trade for ~3% of the row.
+ *
+ * Recheck duty: every number here is measured geometry, not a constant of nature.
+ * A `@linxin666/dsh-remote-web-ui` bump must re-check its 52px rail padding, its
+ * re-seat of `_headerActions` (the `dsh-remote-header-seated` gate) and the
+ * `--dsh-remote-header-actions-reserve` it applies to the tabs row, alongside the
+ * outstanding compact-picker item of 2026-10-12.
  */
 
 import { CODEX_USAGE_ATTR, MOBILE_MAX_WIDTH } from './codexUsageVisibility.ts'
@@ -56,6 +138,60 @@ export const MODEL_BADGE_MARKER_CLASS = 'dsh-model-badge-marker'
 export const SUBAGENT_TYPE_BADGE_CLASS = 'dsh-subagent-type-badge'
 
 /**
+ * Inner text element of {@link MODEL_BADGE_CLASS}.
+ *
+ * It exists so a cap can ellipsize: the badge's content used to be a bare text
+ * node, i.e. an anonymous flex item, and `text-overflow` is defined for block
+ * containers — a capped badge hard-clipped mid-token with no ellipsis. A flex item
+ * is blockified, so this element is a real block container and owns the
+ * truncation, while the badge keeps its own cap.
+ */
+export const MODEL_BADGE_TEXT_CLASS = 'dsh-model-badge-text'
+
+/**
+ * The provider half of the route, inside {@link MODEL_BADGE_TEXT_CLASS}.
+ *
+ * It carries the `/` separator too, so hiding it leaves the model id alone: once
+ * the badge is narrower than the route, the provider is the constant half of the
+ * text and the model is the half that identifies the route. Every tier that caps
+ * the badge hides this element; `title` and `aria-label` keep the full route.
+ */
+export const MODEL_BADGE_PROVIDER_CLASS = 'dsh-model-badge-provider'
+
+/**
+ * Inner text element of {@link SUBAGENT_TYPE_BADGE_CLASS}, for the same reason as
+ * {@link MODEL_BADGE_TEXT_CLASS}.
+ */
+export const SUBAGENT_TYPE_BADGE_TEXT_CLASS = 'dsh-subagent-type-badge-text'
+
+/**
+ * Title-row width at which both badges drop to {@link BADGE_SHRINK_MAX_WIDTH}.
+ *
+ * Between this and core's own 540px shed, the worst-case occupant set is a 180px
+ * preset label + 8px + 142px badge + 8px + 142px badge = ~480px, leaving the name
+ * ~140px on a wide row instead of the 0px a 234px badge would leave. Above the
+ * tier nothing changes.
+ */
+const TITLE_ROW_SHRINK_MAX_WIDTH = 620
+
+/**
+ * Title-row width at which the badges leave the row (a child keeps a compact
+ * model-only box).
+ *
+ * Set by the largest mainstream phone class, 430px, in the configuration where
+ * remote's 52px rail padding is not in force: 430 − 48 = 382px. A 380px threshold
+ * would miss that by 2px, and a 540px one would leave the 220px badge on every
+ * phone narrower than 540px — the reported case.
+ */
+const TITLE_ROW_HIDE_MAX_WIDTH = 460
+
+/** Content-width cap for a badge inside the shrink tier (142px border-box). */
+const BADGE_SHRINK_MAX_WIDTH = 132
+
+/** Content-width cap for the compact child badge inside the hide tier (142px border-box). */
+const BADGE_CHILD_MAX_WIDTH = 128
+
+/**
  * The mobile composer override, gated on the conditions remote's own mobile
  * layer keys on (`orientation: portrait` + `pointer: coarse` + a viewport
  * narrower than {@link MOBILE_MAX_WIDTH}) rather than on remote's active-state
@@ -65,6 +201,27 @@ export const SUBAGENT_TYPE_BADGE_CLASS = 'dsh-subagent-type-badge'
  * already wins. No `!important`.
  */
 const MOBILE_COMPOSER_OVERRIDE = `@media (orientation:portrait) and (pointer:coarse) and (max-width:${MOBILE_MAX_WIDTH - 0.02}px){html body [class$="_composerSeat"] [class$="_trailing"]{box-sizing:border-box}}`
+
+/**
+ * The two-tier title-row shed.
+ *
+ * Compact formatting mirroring {@link MOBILE_COMPOSER_OVERRIDE}; the numeric
+ * thresholds are the named constants above, and the class names are spelled out so
+ * the emitted text is greppable in the built artifact. `html body` is the same
+ * defensive tiebreaker the override uses, never a specificity requirement: the
+ * tier-1 cap ties with the base `max-width: 220px` rule, so this fragment must stay
+ * AFTER those base badge rules inside {@link SHEET} — it is appended last, which
+ * also puts it after the compact-picker and composer fragments. The child rule
+ * needs no order help, because `[data-dsh-child]` out-specifies the plain class.
+ *
+ * Tier 1 (≤ 620px): both badges cap, and the model badge drops the provider half so
+ * what is ellipsized is the model id. Tier 2 (≤ 460px): the badges leave the row,
+ * except a child Session's model badge, which stays as a compact model-only box;
+ * and core's 220px crumb cap is released for the current crumb, which is the only
+ * thing truncating the name whenever the tabs row already exists.
+ */
+const TITLE_ROW_SHED = `@container (max-width:${TITLE_ROW_SHRINK_MAX_WIDTH}px){html body .dsh-model-badge,html body .dsh-subagent-type-badge{max-width:${BADGE_SHRINK_MAX_WIDTH}px}html body .dsh-model-badge .dsh-model-badge-provider{display:none}}
+@container (max-width:${TITLE_ROW_HIDE_MAX_WIDTH}px){html body .dsh-subagent-type-badge{display:none}html body .dsh-model-badge{display:none}html body .dsh-model-badge[data-dsh-child]{display:inline-flex;max-width:${BADGE_CHILD_MAX_WIDTH}px}html body [class$="_crumbs"] [class$="_crumbCurrent"]{max-width:none}}`
 
 /** The stylesheet text. One rule block per class, no nesting. */
 const SHEET = `
@@ -106,6 +263,18 @@ const SHEET = `
   flex: none;
   color: var(--dsw-alias-label-secondary);
 }
+.${MODEL_BADGE_TEXT_CLASS} {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.${SUBAGENT_TYPE_BADGE_TEXT_CLASS} {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 :root[${CODEX_USAGE_ATTR}="hidden"] [data-composer-stats] button[aria-haspopup="dialog"] {
   display: none !important;
 }
@@ -114,7 +283,7 @@ const SHEET = `
     display: none !important;
   }
 }
-${COMPACT_PICKER_CONTROLS_SHEET}${MOBILE_COMPOSER_OVERRIDE}`
+${COMPACT_PICKER_CONTROLS_SHEET}${MOBILE_COMPOSER_OVERRIDE}${TITLE_ROW_SHED}`
 
 /**
  * Append the badge stylesheet once per document.

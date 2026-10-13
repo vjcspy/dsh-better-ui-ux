@@ -18,6 +18,11 @@
  * `useProjection` addresses only the Session being viewed. The selector returns a
  * primitive string, so unrelated list churn (session titles, running flags,
  * sibling rows) cannot re-render the header.
+ *
+ * The tool name renders inside a text element of its own, so a width cap ellipsizes
+ * it instead of hard-clipping mid-token (`styles.ts`), and the parent hop itself is
+ * `resolveParentId` from `parentSession.ts` — the shared helper the model badge also
+ * uses, so the two badges can never classify one Session differently.
  */
 
 import type { ReactNode } from 'react'
@@ -30,7 +35,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: declares the `subagentType` key on the client projection table.
 import type {} from '../projection-types.ts'
 
-import { SUBAGENT_TYPE_BADGE_CLASS } from './styles.ts'
+import { resolveParentId } from './parentSession.ts'
+import { SUBAGENT_TYPE_BADGE_CLASS, SUBAGENT_TYPE_BADGE_TEXT_CLASS } from './styles.ts'
 
 /** Registration-side business face: this badge needs no injected value. */
 export interface SubagentTypeBadgeInjected {
@@ -43,24 +49,6 @@ export type SubagentTypeBadgeProps =
   PropsRuntime<'conversation.session.header.actions'>
   & SessionStandardProps
   & PropsLocale<'subagentTypeBadge'>
-
-/**
- * Resolve the parent Session of the Session currently shown.
- *
- * The Session's own subagent address is tried first — it is the child's
- * authoritative record of the pair it belongs to — and the list row's `parentId`
- * is the fallback, because the address is only present for a child that still
- * knows its parent link.
- * @param address - the shown Session's subagent address, if any.
- * @param rowParentId - the shown Session's list-row parent, if any.
- * @returns the parent Session id, or `undefined` when the Session is not a child.
- */
-function resolveParentId(
-  address: { readonly parentSessionId?: SessionId } | undefined,
-  rowParentId: SessionId | undefined,
-): SessionId | undefined {
-  return address?.parentSessionId ?? rowParentId
-}
 
 /** Read the parent's value for the shown child out of one projection-values map. */
 function readFrom(values: unknown, childId: SessionId): string | undefined {
@@ -87,7 +75,7 @@ export function SubagentTypeBadge({ useSession, useSessions, sessionId, t }: Sub
   if (toolName === undefined) return null
   return (
     <span className={SUBAGENT_TYPE_BADGE_CLASS} title={toolName} aria-label={t('aria.type', { type: toolName })}>
-      {toolName}
+      <span className={SUBAGENT_TYPE_BADGE_TEXT_CLASS}>{toolName}</span>
     </span>
   )
 }

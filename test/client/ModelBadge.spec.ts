@@ -41,12 +41,23 @@ const translate = (key: string, params?: Record<string, string>): string =>
 /**
  * Build the props the shell composes for this seat, with the projection seat
  * supplied by the case.
+ *
+ * The two parent seats are stubbed with root-Session defaults — no subagent
+ * address, no list row — because the badge reads them only to mark a CHILD
+ * Session. Every case in this file is a root Session, so the marker stays off and
+ * the route and marker assertions below are unaffected.
  * @param projection - what `useProjection('modelSelection')` returns, or undefined.
  * @returns the composed props.
  */
 function propsFor(projection: Selection | undefined): ModelBadgeProps {
   const useProjection = ((key: string) => (key === 'modelSelection' ? projection : undefined)) as UseProjection
-  return { sessionId: 'session-1', useProjection, t: translate } as unknown as ModelBadgeProps
+  return {
+    sessionId: 'session-1',
+    useProjection,
+    useSession: (selector: (snapshot: unknown) => unknown) => selector({}),
+    useSessions: (selector: (state: unknown) => unknown) => selector({ byId: {} }),
+    t: translate,
+  } as unknown as ModelBadgeProps
 }
 
 /**

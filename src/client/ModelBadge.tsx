@@ -15,6 +15,23 @@
  * A thin session that never sent a request renders nothing, because a route it
  * never used is not a fact worth showing.
  *
+ * The route renders as an inner text element with the provider and the model as
+ * two separate inline elements, so a width cap ellipsizes the model id instead of
+ * hard-clipping the route (`styles.ts` carries the rules and the rationale).
+ * `title` and `aria-label` keep the full `provider/model` string in every tier.
+ *
+ * The badge also reports which Session KIND it is looking at: `data-dsh-child` is
+ * set on our own element only when the shown Session is a child, which is the whole
+ * signal the phone tier uses to keep a compact model-only badge. That case needs it,
+ * because an addressed child's composer renders no model control at all
+ * (`ui-model-selection`: `available = sessions.subagentAddress(sessionId) ===
+ * undefined`, and `ModelSelect` returns null without it), so this badge is the only
+ * place the child's route is visible. The parent link comes from the shared
+ * `resolveParentId` helper — the same one the subagent-type badge uses — so the two
+ * badges can never disagree about a Session's kind. Both seat reads behind the
+ * marker return a primitive, a Session id and a boolean, so churn in either store
+ * cannot re-render the header for a value that did not change.
+ *
  * Side channel: every render reports its effective provider to the mobile
  * subscription-visibility gate (`reportEffectiveProvider`), so the Codex usage
  * pill stays hidden on mobile unless this Session runs a `codex` route. The call
@@ -31,7 +48,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 import { reportEffectiveProvider } from './codexUsageVisibility.ts'
-import { MODEL_BADGE_CLASS, MODEL_BADGE_MARKER_CLASS } from './styles.ts'
+import { resolveParentId } from './parentSession.ts'
+import { MODEL_BADGE_CLASS, MODEL_BADGE_MARKER_CLASS, MODEL_BADGE_PROVIDER_CLASS, MODEL_BADGE_TEXT_CLASS } from './styles.ts'
 
 /** Registration-side business face: this badge needs no injected value. */
 export interface ModelBadgeInjected {
@@ -50,7 +68,14 @@ export type ModelBadgeProps =
  * @param props - composed slot props, including the session projection seat.
  * @returns the badge, or nothing while the Session records no route.
  */
-export function ModelBadge({ useProjection, t }: ModelBadgeProps): ReactNode {
+export function ModelBadge({ useSession, useSessions, sessionId, useProjection, t }: ModelBadgeProps): ReactNode {
+  // Both selectors return a primitive, so a snapshot or list update that did not
+  // change this Session's kind cannot re-render the header.
+  const addressParentId = useSession(session => session.subagent?.address?.parentSessionId)
+  const child = useSessions(
+    state => resolveParentId({ parentSessionId: addressParentId }, state.byId[sessionId]?.parentId) !== undefined,
+  )
+
   const projection = useProjection('modelSelection')
   if (projection === undefined) {
     reportEffectiveProvider(undefined)
@@ -73,10 +98,14 @@ export function ModelBadge({ useProjection, t }: ModelBadgeProps): ReactNode {
   return (
     <span
       className={MODEL_BADGE_CLASS}
+      data-dsh-child={child ? '' : undefined}
       title={route}
       aria-label={next ? t('aria.next', { model: route }) : t('aria.current', { model: route })}
     >
-      {route}
+      <span className={MODEL_BADGE_TEXT_CLASS}>
+        <span className={MODEL_BADGE_PROVIDER_CLASS}>{model.provider}/</span>
+        {model.model}
+      </span>
       {next ? <span className={MODEL_BADGE_MARKER_CLASS}>{t('marker.next')}</span> : null}
     </span>
   )
