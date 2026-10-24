@@ -176,7 +176,7 @@ Hiding the wrapper elements rather than only emptying the slots is what the layo
 when its component renders nothing, and `display: none` also keeps the box out of the flex line's gap distribution so the
 wordmark sits at the row's leading edge. The third rule is the one that adds behaviour: `SidebarRoot.module.css` keeps the
 collapsed toggle's panel icon at `display: none` and reveals it on `:hover` only, because at rest the rail shows the mark
-instead — removing the mark without that rule leaves the collapsed sidebar with no visible expand affordance until the
+instead: removing the mark without that rule leaves the collapsed sidebar with no visible expand affordance until the
 pointer arrives. All four rules use no `!important`; the `html body` prefixes give them the specificity to beat the
 module's own `.collapsed .toggle .panelIcon` pair.
 
@@ -188,7 +188,7 @@ translate function per *(face, namespace, revision)* and re-derives it only when
 so the override registers an empty dictionary under its own namespace (`dshBetterUiUxBrand`) to publish that revision, and
 its disposer restores `bind` **before** disposing the registration so the restore is published too. Nothing here writes
 `document.title`: `AppFrame`/`DocumentTitle` own that projection, including the `<session title> - <product title>` form.
-The build-version pill survives untouched — it is `SidebarRoot`'s own fallback markup around the localized title, and the
+The build-version pill survives untouched: it is `SidebarRoot`'s own fallback markup around the localized title, and the
 plugin keeps the slot unoccupied so it keeps rendering.
 
 ### Verification (2026-10-24)
@@ -199,7 +199,7 @@ with zero test-file changes**; `pnpm run build` emitted `lib/client.js` at 49 88
 **0** `failed to import` / `installation rejected` / `incompatible` / `skipped` / `pending` and no `startup-*.log`, and the
 served per-plugin artifact (`plugins/??dsh-better-ui-ux/client.js&rev=d0bc767d6a7b`, HTTP 200, 49 852 bytes) carries
 `AWEAVE PLATFORM`, the `brand.localBuild` key, the namespace, all four selectors, no `!important` of its own and no hex
-colour. **Browser-visible behaviour is `not verified at this level`** — no browser was started, so the rendered absence of
+colour. **Browser-visible behaviour is `not verified at this level`** : no browser was started, so the rendered absence of
 the marks, the rail icon at rest and the tab title are the Human's post-apply check. The `dsh-opencode-go` route could not
 be exercised in this container: both stored OpenCode Go keys answer `401 api_key_expired`, so the round-trip was run on
 `deepseek-official/deepseek-flash` instead (one `bash` call paired with its result carrying `PROBE_OK_12345`,
