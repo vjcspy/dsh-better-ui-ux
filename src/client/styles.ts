@@ -223,6 +223,34 @@ const MOBILE_COMPOSER_OVERRIDE = `@media (orientation:portrait) and (pointer:coa
 const TITLE_ROW_SHED = `@container (max-width:${TITLE_ROW_SHRINK_MAX_WIDTH}px){html body .dsh-model-badge,html body .dsh-subagent-type-badge{max-width:${BADGE_SHRINK_MAX_WIDTH}px}html body .dsh-model-badge .dsh-model-badge-provider{display:none}}
 @container (max-width:${TITLE_ROW_HIDE_MAX_WIDTH}px){html body .dsh-subagent-type-badge{display:none}html body .dsh-model-badge{display:none}html body .dsh-model-badge[data-dsh-child]{display:inline-flex;max-width:${BADGE_CHILD_MAX_WIDTH}px}html body [class$="_crumbs"] [class$="_crumbCurrent"]{max-width:none}}`
 
+/**
+ * The deployment's brand-mark suppression.
+ *
+ * A local build renders the shell's own fish mark in three places — the expanded
+ * sidebar brand row (`.brandMark`, whose slot falls back to `FishLogo`), the
+ * collapsed rail's resting swap inside the toggle (`.railMark`) and the
+ * blank-Session hero headline (`.fishHitbox`, the animated `HeroFish`) — and this
+ * deployment shows none of them. Hiding the WRAPPER elements, not only emptying
+ * the slots, is what the layout needs: a slot's wrapper stays mounted when its
+ * component renders nothing, and `display: none` also drops the box out of the
+ * flex line's gap distribution, so the brand text moves to the row's leading edge
+ * instead of leaving an 8px / 10px hole.
+ *
+ * The panel icon is the one rule that ADDS behaviour. `SidebarRoot.module.css`
+ * keeps the collapsed toggle's `.panelIcon` at `display: none` and reveals it only
+ * on `:hover`, because at rest the rail shows the whale mark instead — so
+ * removing that mark has to put the icon back on its own, or the collapsed
+ * sidebar's expand affordance disappears until the pointer arrives. The
+ * `html body` prefixes carry the specificity to win over the module's
+ * `.collapsed .toggle .panelIcon` pair without `!important`, exactly like
+ * {@link MOBILE_COMPOSER_OVERRIDE} and {@link TITLE_ROW_SHED}.
+ */
+const BRAND_LOGO_OVERRIDE = `
+html body [class$="_brandIdentity"] [class$="_brandMark"]{display:none}
+html body [class$="_toggle"] [class$="_railMark"]{display:none}
+html body [class$="_collapsed"] [class$="_toggle"] [class$="_panelIcon"]{display:inline}
+html body [class$="_headline"] [class$="_fishHitbox"]{display:none}`
+
 /** The stylesheet text. One rule block per class, no nesting. */
 const SHEET = `
 .${MODEL_BADGE_CLASS} {
@@ -283,7 +311,7 @@ const SHEET = `
     display: none !important;
   }
 }
-${COMPACT_PICKER_CONTROLS_SHEET}${MOBILE_COMPOSER_OVERRIDE}${TITLE_ROW_SHED}`
+${COMPACT_PICKER_CONTROLS_SHEET}${MOBILE_COMPOSER_OVERRIDE}${TITLE_ROW_SHED}${BRAND_LOGO_OVERRIDE}`
 
 /**
  * Append the badge stylesheet once per document.

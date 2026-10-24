@@ -154,6 +154,62 @@ Rotation (portrait → landscape → portrait) reproduces the same fixed-state n
 remote's sheet re-append order. See "Known limitations" for the coupling this creates and what to re-check on a
 `@linxin666/dsh-remote-web-ui` bump.
 
+## Deployment brand: no fish mark, `AWEAVE PLATFORM` title
+
+A local source build renders the shell's own fallbacks: the whale mark beside the wordmark in the expanded sidebar, the
+same mark as the collapsed rail's resting icon, the animated hero fish on a blank Session, and the two-line
+`DSH Local Build` + build-version brand. This deployment shows no mark and names itself `AWEAVE PLATFORM`, so the plugin
+owns both halves of that presentation without a core patch.
+
+**The mark is removed in the stylesheet** (`BRAND_LOGO_OVERRIDE` in `src/client/styles.ts`, appended to the sheet the
+badges already use). Four rules key on core's CSS-module suffixes, which are stable because the class names end with
+their local name (`Z58hQG_brandMark`, `LoRAjW_fishHitbox` in the built shell):
+
+| Rule | Effect |
+| --- | --- |
+| `[class$="_brandIdentity"] [class$="_brandMark"]` | hides the expanded sidebar's mark (whose slot falls back to `FishLogo`) |
+| `[class$="_toggle"] [class$="_railMark"]` | hides the collapsed rail's resting mark |
+| `[class$="_collapsed"] [class$="_toggle"] [class$="_panelIcon"]` | **shows** the rail toggle's panel icon at rest |
+| `[class$="_headline"] [class$="_fishHitbox"]` | hides the blank-Session hero fish |
+
+Hiding the wrapper elements rather than only emptying the slots is what the layout needs: a slot's wrapper stays mounted
+when its component renders nothing, and `display: none` also keeps the box out of the flex line's gap distribution so the
+wordmark sits at the row's leading edge. The third rule is the one that adds behaviour: `SidebarRoot.module.css` keeps the
+collapsed toggle's panel icon at `display: none` and reveals it on `:hover` only, because at rest the rail shows the mark
+instead — removing the mark without that rule leaves the collapsed sidebar with no visible expand affordance until the
+pointer arrives. All four rules use no `!important`; the `html body` prefixes give them the specificity to beat the
+module's own `.collapsed .toggle .panelIcon` pair.
+
+**The title is renamed at the locale face, not by re-rendering either surface** (`src/client/brandTitle.ts`). `SidebarRoot`
+writes `t('brand.localBuild')` into the title line and `AppFrame` derives the browser tab title from the same key, both
+resolving it through the shared `common` namespace, so wrapping `ctx.locale.bind` renames both from one source while every
+other key delegates unchanged. The revision publication is load-bearing rather than cosmetic: `SlotRenderer` caches one
+translate function per *(face, namespace, revision)* and re-derives it only when the locale snapshot's revision advances,
+so the override registers an empty dictionary under its own namespace (`dshBetterUiUxBrand`) to publish that revision, and
+its disposer restores `bind` **before** disposing the registration so the restore is published too. Nothing here writes
+`document.title`: `AppFrame`/`DocumentTitle` own that projection, including the `<session title> - <product title>` form.
+The build-version pill survives untouched — it is `SidebarRoot`'s own fallback markup around the localized title, and the
+plugin keeps the slot unoccupied so it keeps rendering.
+
+### Verification (2026-10-24)
+
+Container `dsh-brand-aweave-title` (port 3181) on the `dsh-v0.2.1-rc.2` baseline, `basic` level by the Human's
+instruction: `pnpm run check` exit 0 across the three compiler faces; `pnpm run test` **7 spec files / 107 cases green
+with zero test-file changes**; `pnpm run build` emitted `lib/client.js` at 49 889 bytes. The container host booted with
+**0** `failed to import` / `installation rejected` / `incompatible` / `skipped` / `pending` and no `startup-*.log`, and the
+served per-plugin artifact (`plugins/??dsh-better-ui-ux/client.js&rev=d0bc767d6a7b`, HTTP 200, 49 852 bytes) carries
+`AWEAVE PLATFORM`, the `brand.localBuild` key, the namespace, all four selectors, no `!important` of its own and no hex
+colour. **Browser-visible behaviour is `not verified at this level`** — no browser was started, so the rendered absence of
+the marks, the rail icon at rest and the tab title are the Human's post-apply check. The `dsh-opencode-go` route could not
+be exercised in this container: both stored OpenCode Go keys answer `401 api_key_expired`, so the round-trip was run on
+`deepseek-official/deepseek-flash` instead (one `bash` call paired with its result carrying `PROBE_OK_12345`,
+`turn/end` `completed`), and that route stays **not verified at this level**.
+
+Recheck duty: the four selectors name core's own CSS-module suffixes and internal structure. A `deepseek-harness` baseline
+move must re-read `packages/client/ui-sidebar/src/client/SidebarRoot.tsx` (the `.brandIdentity` / `.brandMark` /
+`.railMark` / collapsed `.panelIcon` swap) and `packages/client/ui-conversation/src/client/skeleton/EmptyHero.tsx` (the
+`.headline` / `.fishHitbox` pair), and re-run the four substring assertions above.
+
 ## Local build
 
 ```bash
@@ -298,7 +354,8 @@ src/
     SubagentTypeBadge.tsx  The type badge: child → parent → the parent's value for that child
     DefaultSidebarTab.tsx  The new-Session Files default: guard, then open the panel in a microtask
     locales.ts         English dictionaries and both namespaces' key sets
-    styles.ts          The badges' owned, scoped <style> element (data-plugin)
+    brandTitle.ts      The brand-title override: one wrapped locale.bind, one revision publication
+    styles.ts          The badges' owned, scoped <style> element (data-plugin) + the brand-mark suppression
     compactPickerControls.ts  The compact-picker _standardControls anchor rules (moved from the dsh-web fork)
 test/
   host/projection.spec.ts       Admission, label tier, exact key, malformed JSON, fork prefix, expiry, wire stability

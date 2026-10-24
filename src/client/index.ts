@@ -42,6 +42,14 @@
  * context -- the plugin-level `inject` list below stays unchanged, so this
  * optional dependency can never hold the badges or the stylesheet pending.
  *
+ *
+ * A fourth contribution renames every local-build brand surface. The shell's
+ * fallback copy lives in one `common` key, `brand.localBuild`, read by both the
+ * sidebar title line and `AppFrame`'s browser-title projection, so wrapping
+ * `ctx.locale.bind` (and publishing one locale revision) renames both from a
+ * single source; see `brandTitle.ts`. The whale mark itself is removed in the
+ * stylesheet below, which also restores the collapsed rail's panel icon that the
+ * mark was standing in for.
  * @module dsh-better-ui-ux/client
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -65,6 +73,7 @@ import {
   SUBAGENT_TYPE_ACTION_ORDER,
   SUBAGENT_TYPE_LOCALE_NAMESPACE,
 } from '../constants.ts'
+import { installBrandTitleOverride } from './brandTitle.ts'
 import { installCodexUsageViewportSync } from './codexUsageVisibility.ts'
 import { installMobileComposerEnter } from './mobileComposerEnter.ts'
 import {
@@ -95,6 +104,10 @@ export function apply(ctx: ClientContext): void {
     () => ctx.locale.register(SUBAGENT_TYPE_LOCALE_NAMESPACE, 'en', enSubagentType),
     `${PLUGIN_ID}: subagent type dictionary`,
   )
+  // The deployment's own brand title, applied over the shell's local-build copy.
+  // Installed after the dictionaries so the first render already resolves it, and
+  // published through one locale revision so an already-mounted page follows.
+  ctx.effect(() => installBrandTitleOverride(ctx.locale), `${PLUGIN_ID}: brand title`)
   installModelBadgeStyles(document)
   ctx.effect(() => {
     if (typeof window === 'undefined') return () => {}

@@ -105,3 +105,25 @@ export const ADMITTED_DELEGATION_TOOL_NAMES: readonly string[] = [
 
 /** Prefix of a project-scoped role-agent tool name (`dsh-project-context`). */
 export const AGENT_TOOL_NAME_PREFIX = 'agent_'
+
+/**
+ * `common`-namespace key the shell's local-build brand copy is read through.
+ *
+ * The sidebar title line (`SidebarRoot`) and the browser tab title
+ * (`AppFrame`/`DocumentTitle`) resolve this one key, so overriding it renames
+ * every local-build brand surface in one step.
+ */
+export const BRAND_LOCAL_BUILD_KEY = 'brand.localBuild'
+
+/** Deployment brand title replacing the shell's local-build label. */
+export const BRAND_TITLE = 'AWEAVE PLATFORM'
+
+/**
+ * Locale namespace registered empty and disposed at once.
+ *
+ * Its product is the revision publication, not a dictionary: `SlotRenderer`
+ * re-derives a `t` seat only when the locale snapshot's revision advances, so an
+ * override installed after the first render needs one to reach mounted outlets.
+ * Distinct from every other namespace this deployment registers.
+ */
+export const BRAND_LOCALE_NAMESPACE = 'dshBetterUiUxBrand'
