@@ -344,7 +344,7 @@ The deployment installs the Web page as an application, and the browser resolves
 app's name and icon from the web app manifest linked at first paint. That surface belongs to the
 Web shell dist, not to the runtime DOM, so the Host half now serves it:
 
-* exact `webServer` routes at the URLs the shell already links — `/manifest.webmanifest`,
+* exact `webServer` routes at the URLs the shell already links: `/manifest.webmanifest`,
   `/favicon.svg`, `/favicon-dark.svg`, `/icons/aweave-icon.svg`, `/icons/aweave-192.png`,
   `/icons/aweave-512.png`, `/icons/aweave-maskable-512.png`;
 * packaged bytes under `assets/brand/`, read once at activation (a missing asset fails the boot
