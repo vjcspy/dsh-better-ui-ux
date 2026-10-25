@@ -52,14 +52,18 @@
  * second grid column is `minmax(0, 1fr)` with `padding: 10px 28px 0 20px`, so a
  * 390px viewport leaves the title row 342px; remote's mobile layer removes another
  * 52px of left padding whenever the sidebar rail is collapsed — the normal phone
- * state — leaving 290px. The two reachable ends are therefore viewport − 100px
- * with that rule active (290px at 390, 330px at 430, the largest mainstream phone
- * class) and viewport − 48px wherever it is not in force (the layer's own
- * force-desktop escape, or the layer disabled): 342px at 390 and 382px at 430.
+ * state — leaving 290px. On a phone in portrait {@link MOBILE_HEADER_OVERRIDE}
+ * lowers that padding from 52px to 28px (the rail button sits in a 28px gutter), so
+ * the row is viewport − 76px there: 314px at 390 and 354px at 430, the largest
+ * mainstream phone class. The ends reachable outside that override stay
+ * viewport − 100px with remote's rule active (290px at 390, 330px at 430) and
+ * viewport − 48px wherever it is not in force (the layer's own force-desktop
+ * escape, or the layer disabled): 342px at 390 and 382px at 430.
  * That last figure is why the hide threshold is 460px and not 380px — a 380px
  * threshold would miss 382px by 2px and silently drop the whole phone fix in that
  * state — while 460px still sits far below the 540px where core sheds its own
- * occupant.
+ * occupant. The thresholds are unchanged by the override: its 314px and 354px rows
+ * are still under both 620px and 460px, so both tiers keep firing on a phone.
  *
  * Two Session states, one fix. With a single tab our badges are `flex: none`
  * siblings of the name, and one 234px badge (220 content + 12 padding + 2 border,
@@ -67,7 +71,9 @@
  * reported "tên không hiện đủ". With several tabs remote takes that same actions
  * box out of flow, paints it over the tabs row and reserves its measured width
  * there, which instead leaves core's own 220px `.crumb` cap as the only thing
- * truncating the name. The hide tier removes our width from both states: it gives
+ * truncating the name. On a phone in portrait that seat is now neutralized by
+ * {@link MOBILE_HEADER_OVERRIDE}, so the multi-tab state behaves like the single-tab
+ * one: the actions box stays in flow inside the title row. The hide tier removes our width from both states: it gives
  * the name back core's cap in the single-tab state (and the crumb rule below
  * releases that cap), and it empties the painted box, so the tabs row's reserve
  * falls from ~242px to the empty box's ~8px.
@@ -108,10 +114,36 @@
  * `.headerActions` has no `:empty` rule. Reshaping a seat other plugins also
  * occupy would be the worse trade for ~3% of the row.
  *
+ * The sheet also owns the phone-portrait header fix ({@link MOBILE_HEADER_OVERRIDE}).
+ * `@linxin666/dsh-remote-web-ui` 0.4.8 seats the whole `_headerActions` box with
+ * `position:absolute` plus an additive inline `translate`: its `alignActionsText`
+ * parses the current translate and adds the difference to a text bottom measured
+ * against core's agent-preset label, which core hides at a narrow row, so the
+ * measurement is 0 and every header mutation (the chevron flip on a tap included)
+ * pushes the box down again; the "N subagents" trigger floated over the transcript
+ * and jumped on tap. The fix puts the box back in flow (`position:static`,
+ * `transform:none`), hides the Chat/Trajectory tabs row while the FIRST tab is the
+ * selected one (a non-first view reveals it again, so a phone user is never stranded
+ * in Trajectory, whose view is persisted per conversation), drops core's 76px header
+ * floor in that state, and pins remote's floating "Open sidebar" button (the whale)
+ * into the title-row gutter as the same 28px ghost panel-icon button the right
+ * sidebar toggle uses. Exactly three declarations are `!important`, because remote
+ * writes them as inline styles and only an author `!important` beats inline: the
+ * `transform` on `_headerActions`, and `left` and `top` on the whale (remote writes
+ * them on every `pointermove`). Everything else wins on specificity, and the whale's
+ * `display` is deliberately NOT important so remote's inline `display:none` while the
+ * sidebar is open still hides it. The gate is the media query that mirrors remote's
+ * `isMobilePortrait()` rather than its body classes (renamed once already); only the
+ * rail-padding rule keys on `dsh-remote-rail-hidden`, because it overrides remote's
+ * rule of that very class. `:has()` cannot nest inside `:has()`, hence the top-level
+ * `:not(:has(...))` forms.
+ *
  * Recheck duty: every number here is measured geometry, not a constant of nature.
  * A `@linxin666/dsh-remote-web-ui` bump must re-check its 52px rail padding, its
  * re-seat of `_headerActions` (the `dsh-remote-header-seated` gate) and the
- * `--dsh-remote-header-actions-reserve` it applies to the tabs row, alongside the
+ * `--dsh-remote-header-actions-reserve` it applies to the tabs row, the whale's id
+ * `#dshRemoteWhale` and its inline `left`/`top` writes, and the first-tab selector
+ * (`[role="tab"][aria-selected="true"]:not(:first-child)`), alongside the
  * outstanding compact-picker item of 2026-10-12.
  */
 
@@ -201,6 +233,37 @@ const BADGE_CHILD_MAX_WIDTH = 128
  * already wins. No `!important`.
  */
 const MOBILE_COMPOSER_OVERRIDE = `@media (orientation:portrait) and (pointer:coarse) and (max-width:${MOBILE_MAX_WIDTH - 0.02}px){html body [class$="_composerSeat"] [class$="_trailing"]{box-sizing:border-box}}`
+
+/**
+ * Core's right-sidebar toggle icon (a 16px panel outline with a left rail), measured on
+ * the live page, URL-encoded for the CSS mask of the whale button.
+ */
+const PANEL_ICON = encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="#000" stroke-width="1"><path d="M13.5 1.5H2.5C1.94772 1.5 1.5 1.94772 1.5 2.5V13.5C1.5 14.0523 1.94772 14.5 2.5 14.5H13.5C14.0523 14.5 14.5 14.0523 14.5 13.5V2.5C14.5 1.94772 14.0523 1.5 13.5 1.5Z"/><path d="M5.5 1.5V14.5"/></svg>',
+)
+
+/**
+ * The phone-portrait header fix; see the file header for what remote does and why.
+ *
+ * Gated on the same three conditions as {@link MOBILE_COMPOSER_OVERRIDE}. Compact
+ * formatting, one rule per line. The three `!important` declarations are the minimum
+ * inline-style forces: remote writes `transform` on `_headerActions` and `left`/`top`
+ * on the whale as inline styles, which beat any selector. The remaining rules win by
+ * specificity over remote's: (0,4,2) over its (0,4,1) seat, (0,3,2) over its (0,3,1)
+ * tabs cap and (0,2,1) rail padding, (1,0,2)/(1,0,3) over its whale rules, so the
+ * fragment needs no ordering help. The whale's `display` carries no `!important`: remote hides
+ * it with an inline `display:none` while the sidebar is open.
+ */
+const MOBILE_HEADER_OVERRIDE = `@media (orientation:portrait) and (pointer:coarse) and (max-width:${MOBILE_MAX_WIDTH - 0.02}px){
+html body [class$="_header"] [class$="_titleRow"] > [class$="_titleCluster"] > [class$="_headerActions"]{position:static;transform:none !important}
+html body [class$="_header"] [class$="_tabs"][role="tablist"]{max-width:none}
+html body [class$="_header"] [class$="_tabs"][role="tablist"]:not(:has(> [role="tab"][aria-selected="true"]:not(:first-child))){display:none}
+html body [class$="_header"]:has(> * > [class$="_titleRow"]):not(:has([role="tab"][aria-selected="true"]:not(:first-child))){min-height:0;padding-bottom:10px}
+html body.dsh-remote-rail-hidden [class$="_header"] [class$="_titleRow"]{padding-left:28px}
+html body #dshRemoteWhale{left:calc(12px + env(safe-area-inset-left)) !important;top:calc(11px + env(safe-area-inset-top)) !important;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-width:28px;border:0;border-radius:8px;background:transparent;box-shadow:none;color:var(--dsw-alias-label-secondary)}
+html body #dshRemoteWhale > svg{display:none}
+html body #dshRemoteWhale::before{content:"";width:16px;height:16px;background-color:currentColor;-webkit-mask:url("data:image/svg+xml,${PANEL_ICON}") center/16px 16px no-repeat;mask:url("data:image/svg+xml,${PANEL_ICON}") center/16px 16px no-repeat}
+}`
 
 /**
  * The two-tier title-row shed.
@@ -311,7 +374,7 @@ const SHEET = `
     display: none !important;
   }
 }
-${COMPACT_PICKER_CONTROLS_SHEET}${MOBILE_COMPOSER_OVERRIDE}${TITLE_ROW_SHED}${BRAND_LOGO_OVERRIDE}`
+${COMPACT_PICKER_CONTROLS_SHEET}${MOBILE_COMPOSER_OVERRIDE}${TITLE_ROW_SHED}${BRAND_LOGO_OVERRIDE}${MOBILE_HEADER_OVERRIDE}`
 
 /**
  * Append the badge stylesheet once per document.
