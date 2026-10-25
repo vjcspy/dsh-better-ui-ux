@@ -338,6 +338,25 @@ with the plugin absent had no `subagentType` row; after installing the plugin an
 existed with all bindings, and a row left at a stale `ver` was rewritten at the registration's current version. So
 pre-existing sessions are not stranded, and a future `stateVersion` bump self-heals on the next read.
 
+## Browser install identity: `Aweave` manifest, favicons and app icons
+
+The deployment installs the Web page as an application, and the browser resolves an installed
+app's name and icon from the web app manifest linked at first paint. That surface belongs to the
+Web shell dist, not to the runtime DOM, so the Host half now serves it:
+
+* exact `webServer` routes at the URLs the shell already links — `/manifest.webmanifest`,
+  `/favicon.svg`, `/favicon-dark.svg`, `/icons/aweave-icon.svg`, `/icons/aweave-192.png`,
+  `/icons/aweave-512.png`, `/icons/aweave-maskable-512.png`;
+* packaged bytes under `assets/brand/`, read once at activation (a missing asset fails the boot
+  loudly), each with its own `content-type` and `cache-control: no-cache`;
+* `GET`/`HEAD` only, `405` with `allow` for any other method.
+
+Exact routes win over the SPA dist fallback, so no core file changes: the shell's `index.html`,
+`apps/web/public/**` and upstream's `pwa-manifest.e2e.ts` stay untouched. The manifest keeps
+relative members and no `id`, so each public mount keeps its own resolved identity. An installed
+app must be uninstalled and installed again after a deploy for the browser to pick up a changed
+name or icon.
+
 ## Layout
 
 ```text

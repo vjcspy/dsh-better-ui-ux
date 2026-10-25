@@ -14,6 +14,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 
 import { PLUGIN_ID, SUBAGENT_TYPE_PROJECTION_KEY } from './constants.ts'
+import { installBrandRoutes } from './installIdentity.ts'
 import { subagentTypeProjectionDefinition } from './projection.ts'
 // Type-only and load-bearing: this module's declaration merges are what make the
 // projection key addressable on both the host fold table and the client hook
@@ -46,5 +47,6 @@ export function apply(ctx: Context): void {
   ctx.inject(['sessionProjections'], (projectionCtx) => {
     projectionCtx.sessionProjections.register(subagentTypeProjectionDefinition)
   })
+  installBrandRoutes(ctx)
   ctx.logger.debug(`${PLUGIN_ID}: host half active; the subagent-type projection is registered`)
 }
