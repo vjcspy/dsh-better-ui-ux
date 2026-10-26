@@ -132,7 +132,11 @@
  * `transform` on `_headerActions`, and `left` and `top` on the whale (remote writes
  * them on every `pointermove`). Everything else wins on specificity, and the whale's
  * `display` is deliberately NOT important so remote's inline `display:none` while the
- * sidebar is open still hides it. The gate is the media query that mirrors remote's
+ * sidebar is open still hides it. One more rule hides the whale while core's right panel
+ * is fullscreen (`data-rightbar-fullscreen` on the frame, which on a phone is the only
+ * visible right panel): remote's `syncWhale` checks the left sidebar and `_overlay`
+ * but never the right panel, so the button stayed painted over the panel's first tab and
+ * swallowed its taps. The gate is the media query that mirrors remote's
  * `isMobilePortrait()` rather than its body classes (renamed once already); only the
  * rail-padding rule keys on `dsh-remote-rail-hidden`, because it overrides remote's
  * rule of that very class. `:has()` cannot nest inside `:has()`, hence the top-level
@@ -143,7 +147,9 @@
  * re-seat of `_headerActions` (the `dsh-remote-header-seated` gate) and the
  * `--dsh-remote-header-actions-reserve` it applies to the tabs row, the whale's id
  * `#dshRemoteWhale` and its inline `left`/`top` writes, and the first-tab selector
- * (`[role="tab"][aria-selected="true"]:not(:first-child)`), alongside the
+ * (`[role="tab"][aria-selected="true"]:not(:first-child)`), core's frame attribute
+ * `data-rightbar-fullscreen` (a rename makes the whale rule inert and the whale reappears
+ * over the right panel), alongside the
  * outstanding compact-picker item of 2026-10-12.
  */
 
@@ -252,7 +258,10 @@ const PANEL_ICON = encodeURIComponent(
  * specificity over remote's: (0,4,2) over its (0,4,1) seat, (0,3,2) over its (0,3,1)
  * tabs cap and (0,2,1) rail padding, (1,0,2)/(1,0,3) over its whale rules, so the
  * fragment needs no ordering help. The whale's `display` carries no `!important`: remote hides
- * it with an inline `display:none` while the sidebar is open.
+ * it with an inline `display:none` while the sidebar is open. The last rule, (1,1,2) over
+ * the whale restyle's (1,0,2), hides it while the right panel is fullscreen; it needs no
+ * `!important` either, because remote's inline `display` is `''` whenever it shows the
+ * whale.
  */
 const MOBILE_HEADER_OVERRIDE = `@media (orientation:portrait) and (pointer:coarse) and (max-width:${MOBILE_MAX_WIDTH - 0.02}px){
 html body [class$="_header"] [class$="_titleRow"] > [class$="_titleCluster"] > [class$="_headerActions"]{position:static;transform:none !important}
@@ -263,6 +272,7 @@ html body.dsh-remote-rail-hidden [class$="_header"] [class$="_titleRow"]{padding
 html body #dshRemoteWhale{left:calc(12px + env(safe-area-inset-left)) !important;top:calc(11px + env(safe-area-inset-top)) !important;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-width:28px;border:0;border-radius:8px;background:transparent;box-shadow:none;color:var(--dsw-alias-label-secondary)}
 html body #dshRemoteWhale > svg{display:none}
 html body #dshRemoteWhale::before{content:"";width:16px;height:16px;background-color:currentColor;-webkit-mask:url("data:image/svg+xml,${PANEL_ICON}") center/16px 16px no-repeat;mask:url("data:image/svg+xml,${PANEL_ICON}") center/16px 16px no-repeat}
+html body:has([data-rightbar-fullscreen]) #dshRemoteWhale{display:none}
 }`
 
 /**
