@@ -14,6 +14,7 @@
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm/brand'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -121,7 +122,7 @@ describe('header model badge', () => {
     // v1 shows no reasoning effort, but the projection carries one and the route
     // itself must survive untouched.
     const html = render({
-      lastUsed: { provider: 'deepseek-official', model: 'deepseek-v4-pro', reasoningEffort: 'high' },
+      lastUsed: { provider: 'deepseek-official', model: 'deepseek-v4-pro', reasoningEffort: ReasoningEffortId('high') },
       next: null,
     })
     expect(html).toContain('deepseek-official/deepseek-v4-pro')
